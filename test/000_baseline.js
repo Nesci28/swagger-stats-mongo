@@ -13,8 +13,6 @@ const swsUtil = require("../lib/swsUtil.js");
 
 setImmediate(() => {
   describe("Baseline test", () => {
-    // this.timeout(20000);
-
     let app = null;
     let api = null;
 
@@ -151,6 +149,7 @@ setImmediate(() => {
             if (err) return done(err);
 
             res.body.should.not.be.empty;
+            console.log("res.body :>> ", res.body);
             apiStatsCurrent = res.body;
             done();
           });
