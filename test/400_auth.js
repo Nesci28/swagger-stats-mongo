@@ -1,268 +1,280 @@
-'use strict';
-var util = require('util');
-var chai = require('chai');
-chai.should();
-var expect = chai.expect;
-var supertest = require('supertest');
-var cuid = require('cuid');
+const util = require("util");
+const chai = require("chai");
 
-var Q = require('q');
-var http = require('http');
+chai.should();
+const { expect } = chai;
+const supertest = require("supertest");
+const cuid = require("cuid");
+
+const Q = require("q");
+const http = require("http");
 
 // We will use it to store expected values
-var swsReqResStats = require('../lib/swsReqResStats');
-var swsUtil = require('../lib/swsUtil');
+const debug = require("debug")("swstest:auth");
+const swsReqResStats = require("../lib/swsReqResStats");
+const swsUtil = require("../lib/swsUtil");
 
-var debug = require('debug')('swstest:auth');
+const swsTestFixture = require("./testfixture");
+const swsTestUtils = require("./testutils");
 
-var swsTestFixture = require('./testfixture');
-var swsTestUtils = require('./testutils');
+const swaggerSpecUrl = "./examples/authtest/petstore3.yaml"; // Default
 
-var swaggerSpecUrl = './examples/authtest/petstore3.yaml';   // Default
-
-var appAuthTest = null;
-var apiAuthTest = null;
-
+let appAuthTest = null;
+let apiAuthTest = null;
 
 let initialStatRequests = 0;
 
 function isNonEmptyString(str) {
-    return typeof str == 'string' && !!str.trim();
+  return typeof str === "string" && !!str.trim();
 }
 
 function parseSetCookie(setCookieValue, options) {
-    var parts = setCookieValue.split(';').filter(isNonEmptyString);
-    var nameValue = parts.shift().split("=");
-    var name = nameValue.shift();
-    var value = nameValue.join("="); // everything after the first =, joined by a "=" if there was more than one part
-    var cookie = {
-        name: name, // grab everything before the first =
-        value: value
-    };
+  const parts = setCookieValue.split(";").filter(isNonEmptyString);
+  const nameValue = parts.shift().split("=");
+  const name = nameValue.shift();
+  const value = nameValue.join("="); // everything after the first =, joined by a "=" if there was more than one part
+  const cookie = {
+    name, // grab everything before the first =
+    value,
+  };
 
-    parts.forEach(function (part) {
-        var sides = part.split("=");
-        var key = sides.shift().trimLeft().toLowerCase();
-        var value = sides.join("=");
-        if (key == "expires") {
-            cookie.expires = new Date(value);
-        } else if (key == 'max-age') {
-            cookie.maxAge = parseInt(value, 10);
-        } else if (key == 'secure') {
-            cookie.secure = true;
-        } else if (key == 'httponly') {
-            cookie.httpOnly = true;
-        } else {
-            cookie[key] = value;
-        }
-    });
+  parts.forEach((part) => {
+    const sides = part.split("=");
+    const key = sides.shift().trimLeft().toLowerCase();
+    const value = sides.join("=");
+    if (key == "expires") {
+      cookie.expires = new Date(value);
+    } else if (key == "max-age") {
+      cookie.maxAge = parseInt(value, 10);
+    } else if (key == "secure") {
+      cookie.secure = true;
+    } else if (key == "httponly") {
+      cookie.httpOnly = true;
+    } else {
+      cookie[key] = value;
+    }
+  });
 
-    return cookie;
+  return cookie;
 }
 
-setImmediate(function() {
+setImmediate(() => {
+  describe("Authentication test", function () {
+    this.timeout(15000);
 
-    describe('Authentication test', function () {
+    let sessionIdCookie;
 
-        this.timeout(15000);
+    describe("Initialize", () => {
+      it("should initialize example app", (done) => {
+        supertest(swsTestFixture.SWS_AUTHTEST_DEFAULT_URL)
+          .get(swsTestFixture.SWS_TEST_STATS_API)
+          .expect(403)
+          .end((err, res) => {
+            if (err) {
+              process.env.SWS_AUTHTEST_MAXAGE = 2;
+              process.env.SWS_SPECTEST_URL = swaggerSpecUrl;
+              appAuthTest = require("../examples/authtest/authtest");
+              const dest = `http://localhost:${appAuthTest.app.get("port")}`;
+              apiAuthTest = supertest(dest);
+              setTimeout(done, 1000);
+            } else {
+              apiAuthTest = supertest(swsTestFixture.SWS_AUTHTEST_DEFAULT_URL);
+              done();
+            }
+          });
+      });
 
-        var sessionIdCookie;
+      it("should get 403 response for /stats", (done) => {
+        apiAuthTest
+          .get(swsTestFixture.SWS_TEST_STATS_API)
+          .expect(403)
+          .end((err, res) => {
+            if (err) return done(err);
+            done();
+          });
+      });
 
-        describe('Initialize', function () {
+      it("should get 403 response for /metrics", (done) => {
+        apiAuthTest
+          .get(swsTestFixture.SWS_TEST_METRICS_API)
+          .expect(403)
+          .end((err, res) => {
+            if (err) return done(err);
 
+            done();
+          });
+      });
 
-            it('should initialize example app', function (done) {
-                supertest(swsTestFixture.SWS_AUTHTEST_DEFAULT_URL).get(swsTestFixture.SWS_TEST_STATS_API)
-                    .expect(403)
-                    .end(function (err, res) {
-                        if (err) {
-                            process.env.SWS_AUTHTEST_MAXAGE = 2;
-                            process.env.SWS_SPECTEST_URL = swaggerSpecUrl;
-                            appAuthTest = require('../examples/authtest/authtest');
-                            var dest = 'http://localhost:' + appAuthTest.app.get('port');
-                            apiAuthTest = supertest(dest);
-                            setTimeout(done, 1000);
-                        } else {
-                            apiAuthTest = supertest(swsTestFixture.SWS_AUTHTEST_DEFAULT_URL);
-                            done();
-                        }
-                    });
-            });
+      it("should not authenticate with wrong credentials", (done) => {
+        apiAuthTest
+          .get(swsTestFixture.SWS_TEST_STATS_API)
+          .auth("wrong", "wrong")
+          .expect(403)
+          .end((err, res) => {
+            if (err) return done(err);
+            done();
+          });
+      });
 
-            it('should get 403 response for /stats', function (done) {
-                apiAuthTest.get(swsTestFixture.SWS_TEST_STATS_API)
-                    .expect(403)
-                    .end(function (err, res) {
-                        if (err) return done(err);
-                        done();
-                    });
-            });
+      it("should authenticate with correct credentials", (done) => {
+        apiAuthTest
+          .get(swsTestFixture.SWS_TEST_STATS_API)
+          .auth("swagger-stats", "swagger-stats")
+          .expect(200)
+          .expect("set-cookie", /sws-session-id/)
+          .end((err, res) => {
+            if (err) return done(err);
 
-            it('should get 403 response for /metrics', function (done) {
-                apiAuthTest.get(swsTestFixture.SWS_TEST_METRICS_API)
-                    .expect(403)
-                    .end(function (err, res) {
-                        if (err) return done(err);
+            const setCookie = res.headers["set-cookie"][0]; // Setting the cookie
+            const parsed = parseSetCookie(setCookie);
+            sessionIdCookie = parsed.value;
 
-                        done();
-                    });
-            });
+            done();
+          });
+      });
 
+      it("should get statistics values", (done) => {
+        apiAuthTest
+          .get(swsTestFixture.SWS_TEST_STATS_API)
+          .set("Cookie", [`sws-session-id=${sessionIdCookie}`])
+          .expect(200)
+          .end((err, res) => {
+            if (err) return done(err);
 
-            it('should not authenticate with wrong credentials', function (done) {
-                apiAuthTest.get(swsTestFixture.SWS_TEST_STATS_API)
-                    .auth('wrong', 'wrong')
-                    .expect(403)
-                    .end(function (err, res) {
-                        if (err) return done(err);
-                        done();
-                    });
-            });
+            res.body.should.not.be.empty;
+            initialStatRequests = res.body.all.requests;
+            done();
+          });
+      });
 
-            it('should authenticate with correct credentials', function (done) {
-                apiAuthTest.get(swsTestFixture.SWS_TEST_STATS_API)
-                    .auth('swagger-stats', 'swagger-stats')
-                    .expect(200)
-                    .expect('set-cookie', /sws-session-id/)
-                    .end(function (err, res) {
-                        if (err) return done(err);
+      it("should send test request from swagger spec", (done) => {
+        apiAuthTest
+          .get("/v2/pet/findByTags")
+          .set(
+            "x-sws-res",
+            '{"code":"200","message":"TEST","delay":"50","payloadsize":"5"}',
+          )
+          .expect(200)
+          .end((err, res) => {
+            if (err) return done(err);
 
-                        var setCookie = res.headers['set-cookie'][0]; //Setting the cookie
-                        var parsed = parseSetCookie(setCookie);
-                        sessionIdCookie = parsed.value;
+            done();
+          });
+      });
 
-                        done();
-                    });
-            });
+      it("should logout", (done) => {
+        apiAuthTest
+          .get(swsTestFixture.SWS_LOGOUT_API)
+          .set("Cookie", [`sws-session-id=${sessionIdCookie}`])
+          .expect(200)
+          .end((err, res) => {
+            if (err) return done(err);
 
-            it('should get statistics values', function (done) {
-                apiAuthTest.get(swsTestFixture.SWS_TEST_STATS_API)
-                    .set('Cookie', ['sws-session-id='+sessionIdCookie])
-                    .expect(200)
-                    .end(function (err, res) {
-                        if (err) return done(err);
+            done();
+          });
+      });
 
-                        res.body.should.not.be.empty;
-                        initialStatRequests = res.body.all.requests;
-                        done();
-                    });
-            });
+      it("should not get statistics after logout", (done) => {
+        apiAuthTest
+          .get(swsTestFixture.SWS_TEST_STATS_API)
+          .set("Cookie", [`sws-session-id=${sessionIdCookie}`])
+          .expect(403)
+          .end((err, res) => {
+            if (err) return done(err);
 
-            it('should send test request from swagger spec', function (done) {
-                apiAuthTest.get('/v2/pet/findByTags')
-                    .set('x-sws-res','{"code":"200","message":"TEST","delay":"50","payloadsize":"5"}')
-                    .expect(200)
-                    .end(function (err, res) {
-                        if (err) return done(err);
+            done();
+          });
+      });
 
-                        done();
-                    });
-            });
+      it("should not login with wrong credentials using promise based auth method", (done) => {
+        apiAuthTest
+          .get(swsTestFixture.SWS_TEST_STATS_API)
+          .auth("swagger-promise", "wrong")
+          .expect(403)
+          .end((err, res) => {
+            if (err) return done(err);
+            done();
+          });
+      });
 
-            it('should logout', function (done) {
-                apiAuthTest.get(swsTestFixture.SWS_LOGOUT_API)
-                    .set('Cookie', ['sws-session-id='+sessionIdCookie])
-                    .expect(200)
-                    .end(function (err, res) {
-                        if (err) return done(err);
+      it("should login again using promise based auth method", (done) => {
+        apiAuthTest
+          .get(swsTestFixture.SWS_TEST_STATS_API)
+          .auth("swagger-promise", "swagger-promise")
+          .expect(200)
+          .expect("set-cookie", /sws-session-id/)
+          .expect("x-sws-authenticated", /true/)
+          .end((err, res) => {
+            if (err) return done(err);
 
-                        done();
-                    });
-            });
+            const setCookie = res.headers["set-cookie"][0]; // Setting the cookie
+            const parsed = parseSetCookie(setCookie);
+            sessionIdCookie = parsed.value;
 
-            it('should not get statistics after logout', function (done) {
-                apiAuthTest.get(swsTestFixture.SWS_TEST_STATS_API)
-                    .set('Cookie', ['sws-session-id='+sessionIdCookie])
-                    .expect(403)
-                    .end(function (err, res) {
-                        if (err) return done(err);
+            done();
+          });
+      });
 
-                        done();
-                    });
-            });
+      it("should get statistics after second login", (done) => {
+        apiAuthTest
+          .get(swsTestFixture.SWS_TEST_STATS_API)
+          .set("Cookie", [`sws-session-id=${sessionIdCookie}`])
+          .expect(200)
+          .expect("x-sws-authenticated", /true/)
+          .end((err, res) => {
+            if (err) return done(err);
 
-            it('should not login with wrong credentials using promise based auth method', function (done) {
-                apiAuthTest.get(swsTestFixture.SWS_TEST_STATS_API)
-                    .auth('swagger-promise', 'wrong')
-                    .expect(403)
-                    .end(function (err, res) {
-                        if (err) return done(err);
-                        done();
-                    });
-            });
+            res.body.should.not.be.empty;
+            // Should see exactly one request: non-swagger requests monitoring is disabled in this test
+            res.body.all.requests.should.be.equal(initialStatRequests + 1);
+            done();
+          });
+      });
 
-            it('should login again using promise based auth method', function (done) {
-                apiAuthTest.get(swsTestFixture.SWS_TEST_STATS_API)
-                    .auth('swagger-promise', 'swagger-promise')
-                    .expect(200)
-                    .expect('set-cookie', /sws-session-id/)
-                    .expect('x-sws-authenticated', /true/)
-                    .end(function (err, res) {
-                        if (err) return done(err);
+      it("should wait for session to expire", (done) => {
+        setTimeout(() => {
+          done();
+        }, 2000);
+      });
 
-                        var setCookie = res.headers['set-cookie'][0]; //Setting the cookie
-                        var parsed = parseSetCookie(setCookie);
-                        sessionIdCookie = parsed.value;
+      it("should not get statistics after session expired", (done) => {
+        apiAuthTest
+          .get(swsTestFixture.SWS_TEST_STATS_API)
+          .set("Cookie", [`sws-session-id=${sessionIdCookie}`])
+          .expect(403)
+          .end((err, res) => {
+            if (err) return done(err);
 
-                        done();
-                    });
-            });
+            done();
+          });
+      });
 
-            it('should get statistics after second login', function (done) {
-                apiAuthTest.get(swsTestFixture.SWS_TEST_STATS_API)
-                    .set('Cookie', ['sws-session-id='+sessionIdCookie])
-                    .expect(200)
-                    .expect('x-sws-authenticated', /true/)
-                    .end(function (err, res) {
-                        if (err) return done(err);
+      it("should not authenticate /metrics with wrong credentials", (done) => {
+        apiAuthTest
+          .get(swsTestFixture.SWS_TEST_METRICS_API)
+          .auth("wrong", "wrong")
+          .expect(403)
+          .end((err, res) => {
+            if (err) return done(err);
 
-                        res.body.should.not.be.empty;
-                        // Should see exactly one request: non-swagger requests monitoring is disabled in this test
-                        (res.body.all.requests).should.be.equal(initialStatRequests + 1);
-                        done();
-                    });
-            });
+            done();
+          });
+      });
 
-            it('should wait for session to expire', function (done) {
-                setTimeout(function(){done()},2000);
-            });
+      it("should authenticate and return /metrics with right credentials", (done) => {
+        apiAuthTest
+          .get(swsTestFixture.SWS_TEST_METRICS_API)
+          .auth("swagger-stats", "swagger-stats")
+          .expect(200)
+          .end((err, res) => {
+            if (err) return done(err);
 
-            it('should not get statistics after session expired', function (done) {
-                apiAuthTest.get(swsTestFixture.SWS_TEST_STATS_API)
-                    .set('Cookie', ['sws-session-id='+sessionIdCookie])
-                    .expect(403)
-                    .end(function (err, res) {
-                        if (err) return done(err);
+            done();
+          });
+      });
+    });
 
-                        done();
-                    });
-            });
-
-            it('should not authenticate /metrics with wrong credentials', function (done) {
-                apiAuthTest.get(swsTestFixture.SWS_TEST_METRICS_API)
-                    .auth('wrong', 'wrong')
-                    .expect(403)
-                    .end(function (err, res) {
-                        if (err) return done(err);
-
-                        done();
-                    });
-            });
-
-            it('should authenticate and return /metrics with right credentials', function (done) {
-                apiAuthTest.get(swsTestFixture.SWS_TEST_METRICS_API)
-                    .auth('swagger-stats', 'swagger-stats')
-                    .expect(200)
-                    .end(function (err, res) {
-                        if (err) return done(err);
-
-                        done();
-                    });
-            });
-
-        });
-
-/*
+    /*
         // Get API Stats, and check that number of requests / responses is correctly calculated
         describe('Check Statistics', function () {
 
@@ -307,10 +319,7 @@ setImmediate(function() {
 
         });
 */
+  });
 
-    });
-
-    run();
-
+  run();
 });
-

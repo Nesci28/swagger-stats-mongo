@@ -1,0 +1,41 @@
+version: '3.7'
+services:
+  swagger-stats:
+    image: docker.okidoo.co/node-dev:latest
+    container_name: swagger-stats
+    dns: 1.1.1.1
+    env_file:
+      - ./.api.env
+    command: tail -F anything
+    networks:
+      - swagger-stats
+    ports:
+      - ${API_DEV_PORT}:3000
+    volumes:
+      - ./.npmrc:/home/node/.npmrc
+      - ../:/home/node/app
+      - ~/.ssh/:/home/node/.ssh/
+    depends_on:
+      swagger-stats-mongo:
+        condition: service_healthy
+
+  swagger-stats-mongo:
+    image: mongo:latest
+    container_name: swagger-stats-mongo
+    ports:
+      - ${MONGO_DEV_PORT}:27017
+    env_file:
+      - ./.mongo.env
+    volumes:
+      - ./mongo:/data/db
+    networks:
+      - swagger-stats
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongo localhost:27017 --quiet
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+networks:
+  swagger-stats:

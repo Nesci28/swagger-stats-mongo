@@ -1,144 +1,141 @@
-'use strict';
-var util = require('util');
-var chai = require('chai');
-chai.should();
-var expect = chai.expect;
-var supertest = require('supertest');
-var request = require('request');
-var cuid = require('cuid');
+const util = require("util");
+const chai = require("chai");
 
-var Q = require('q');
-var http = require('http');
+chai.should();
+const { expect } = chai;
+const supertest = require("supertest");
+const request = require("request");
+const cuid = require("cuid");
+
+const Q = require("q");
+const http = require("http");
 
 // We will use it to store expected values
-var swsReqResStats = require('../lib/swsReqResStats');
-var swsUtil = require('../lib/swsUtil');
+const debug = require("debug")("swstest:auth");
+const swsReqResStats = require("../lib/swsReqResStats");
+const swsUtil = require("../lib/swsUtil");
 
-var debug = require('debug')('swstest:auth');
+const swsTestFixture = require("./testfixture");
+const swsTestUtils = require("./testutils");
 
-var swsTestFixture = require('./testfixture');
-var swsTestUtils = require('./testutils');
+const swaggerSpecUrl = "./examples/spectest/petstore.yaml"; // Default
 
-var swaggerSpecUrl = './examples/spectest/petstore.yaml';   // Default
+let appSpecTest = null;
+let apiSpecTest = null;
 
-var appSpecTest = null;
-var apiSpecTest = null;
+const elasticURL = "http://127.0.0.1:9200";
+const indexTemplate = require("../schema/elasticsearch/api_index_template.json");
 
-var elasticURL = 'http://127.0.0.1:9200';
-var indexTemplate = require('../schema/elasticsearch/api_index_template.json');
-
-var test_request_id = cuid();
-
-
+const test_request_id = cuid();
 
 function isNonEmptyString(str) {
-    return typeof str == 'string' && !!str.trim();
+  return typeof str === "string" && !!str.trim();
 }
 
-setImmediate(function() {
+setImmediate(() => {
+  describe("Elasticsearch test", function () {
+    this.timeout(15000);
 
-    describe('Elasticsearch test', function () {
+    describe("Initialize", () => {
+      it("should initialize spectest  app", (done) => {
+        supertest(swsTestFixture.SWS_SPECTEST_DEFAULT_URL)
+          .get(swsTestFixture.SWS_TEST_STATS_API)
+          .expect(200)
+          .end((err, res) => {
+            if (err) {
+              if (res && res.status === 403) {
+                apiSpecTest = supertest
+                  .agent(swsTestFixture.SWS_TEST_DEFAULT_URL)
+                  .auth("swagger-stats", "swagger-stats");
+                done();
+              } else {
+                process.env.SWS_SPECTEST_URL = swaggerSpecUrl;
+                process.env.SWS_ELASTIC = elasticURL;
+                process.env.SWS_ELASTIC_INDEX_PREFIX = "swaggerstats-";
+                appSpecTest = require("../examples/spectest/spectest");
+                const dest = `http://localhost:${appSpecTest.app.get("port")}`;
+                apiSpecTest = supertest(dest);
+                setTimeout(done, 2000);
+              }
+            } else {
+              apiSpecTest = supertest(swsTestFixture.SWS_SPECTEST_DEFAULT_URL);
+              done();
+            }
+          });
+      });
 
-        this.timeout(15000);
+      it("should get index template from Elasticsearch ", (done) => {
+        // Check if there is a template
+        const templateURL = `${elasticURL}/_template/template_api`;
+        request.get(
+          { url: templateURL, json: true },
+          (error, response, body) => {
+            if (error) {
+              debug("Error querying template:", JSON.stringify(error));
+              done(error);
+            } else {
+              response.should.have.property("statusCode");
+              response.statusCode.should.be.equal(200);
+              body.should.have.property("template_api");
+              body.template_api.should.have.property("version");
+              body.template_api.version.should.be.equal(indexTemplate.version);
+              done();
+            }
+          },
+        );
+      });
 
-        describe('Initialize', function () {
+      it("should send test requests", function (done) {
+        this.timeout(10000);
 
-            it('should initialize spectest  app', function (done) {
-                supertest(swsTestFixture.SWS_SPECTEST_DEFAULT_URL).get(swsTestFixture.SWS_TEST_STATS_API)
-                    .expect(200)
-                    .end(function (err, res) {
-                        if (err) {
-                            if( res && res.status === 403 ){
-                                apiSpecTest = supertest.agent(swsTestFixture.SWS_TEST_DEFAULT_URL).auth('swagger-stats','swagger-stats');
-                                done();
-                            } else {
-                                process.env.SWS_SPECTEST_URL = swaggerSpecUrl;
-                                process.env.SWS_ELASTIC = elasticURL;
-                                process.env.SWS_ELASTIC_INDEX_PREFIX = "swaggerstats-";
-                                appSpecTest = require('../examples/spectest/spectest');
-                                var dest = 'http://localhost:' + appSpecTest.app.get('port');
-                                apiSpecTest = supertest(dest);
-                                setTimeout(done, 2000);
-                            }
-                        } else {
-                            apiSpecTest = supertest(swsTestFixture.SWS_SPECTEST_DEFAULT_URL);
-                            done();
-                        }
-                    });
+        for (let i = 0; i < 10; i++) {
+          apiSpecTest
+            .get("/v2/mockapi")
+            .set("x-ses-test-id", test_request_id)
+            .set("x-ses-test-seq", i)
+            .set(
+              "x-sws-res",
+              '{"code":"200","message":"TEST","delay":"50","payloadsize":"5"}',
+            )
+            .expect(200)
+            .end((err, res) => {
+              if (err) return done(err);
             });
+        }
+        setTimeout(done, 5100);
+      });
 
-            it('should get index template from Elasticsearch ', function (done) {
+      it("should find test request in Elasticsearch", (done) => {
+        const searchBody = {
+          from: 0,
+          size: 100,
+          query: {
+            term: {
+              "http.request.headers.x-ses-test-id": test_request_id,
+            },
+          },
+        };
 
-                // Check if there is a template
-                var templateURL = elasticURL+'/_template/template_api';
-                request.get({url:templateURL, json:true}, function (error, response, body) {
-                    if(error) {
-                        debug("Error querying template:", JSON.stringify(error) );
-                        done(error);
-                    }else {
-
-                        response.should.have.property('statusCode');
-                        (response.statusCode).should.be.equal(200);
-                        body.should.have.property('template_api');
-                        body.template_api.should.have.property('version');
-                        (body.template_api.version).should.be.equal(indexTemplate.version);
-                        done();
-                    }
-                });
-
-            });
-
-            it('should send test requests', function (done) {
-                this.timeout(10000);
-
-                for(var i=0;i<10;i++) {
-                    apiSpecTest.get('/v2/mockapi')
-                        .set('x-ses-test-id', test_request_id)
-                        .set('x-ses-test-seq', i)
-                        .set('x-sws-res', '{"code":"200","message":"TEST","delay":"50","payloadsize":"5"}')
-                        .expect(200)
-                        .end(function (err, res) {
-                            if (err) return done(err);
-                        });
-                }
-                setTimeout(done, 5100);
-            });
-
-            it('should find test request in Elasticsearch', function (done) {
-
-
-                var searchBody = {
-                    "from" : 0,
-                    "size" : 100,
-                    "query" : {
-                        "term" : {
-                            "http.request.headers.x-ses-test-id" : test_request_id
-                        }
-                    }
-                };
-
-                var searchURL = elasticURL+'/_search'; //?q='+test_request_id;
-                request.post({url:searchURL, body: searchBody, json:true}, function (error, response, body) {
-                    if(error) {
-                        debug("Error searching for request:", JSON.stringify(error) );
-                        done(error);
-                    }else {
-                        response.should.have.property('statusCode');
-                        (response.statusCode).should.be.equal(200);
-                        body.should.have.property('hits');
-                        body.hits.should.have.property('total');
-                        //(body.hits.total.value).should.be.equal(10);
-                        done();
-                    }
-                });
-
-            });
-
-        });
-
+        const searchURL = `${elasticURL}/_search`; // ?q='+test_request_id;
+        request.post(
+          { url: searchURL, body: searchBody, json: true },
+          (error, response, body) => {
+            if (error) {
+              debug("Error searching for request:", JSON.stringify(error));
+              done(error);
+            } else {
+              response.should.have.property("statusCode");
+              response.statusCode.should.be.equal(200);
+              body.should.have.property("hits");
+              body.hits.should.have.property("total");
+              // (body.hits.total.value).should.be.equal(10);
+              done();
+            }
+          },
+        );
+      });
     });
+  });
 
-    run();
-
+  run();
 });
-
