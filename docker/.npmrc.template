@@ -1,0 +1,7 @@
+registry=https://nexus.nos.sh/repository/npm-all/
+always-auth=true
+timeout=120000
+//nexus.nos.sh/repository/npm-all/:_authToken=
+//nexus.nos.sh/repository/npm/:_authToken=
+prefix=/home/node/.npm
+force=true
