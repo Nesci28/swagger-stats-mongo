@@ -1,22 +1,16 @@
+/* eslint-disable no-unused-expressions */
 const chai = require("chai");
 
 chai.should();
-const { expect } = chai;
 
 const http = require("http");
 const supertest = require("supertest");
-const cuid = require("cuid");
-const swaggerParser = require("swagger-parser");
+const SwaggerParser = require("swagger-parser");
 
 const debug = require("debug")("swstest:apicore");
 
-const swsTestFixture = require("./testfixture");
-const swsTestUtils = require("./testutils");
-
-// SWS Utils
-const swsUtil = require("../lib/swsUtil");
-
-const uiMarkup = swsUtil.swsEmbeddedUIMarkup;
+const swsTestFixture = require("./testfixture.js");
+const swsTestUtils = require("./testutils.js");
 
 let swaggerSpecUrl = "./examples/spectest/petstore3.yaml"; // Default
 if (process.env.SWS_SPECTEST_URL) {
@@ -27,9 +21,7 @@ debug("Using Swagger Specification: %s", swaggerSpecUrl);
 // https://api.apis.guru/v2/specs/amazonaws.com/rekognition/2016-06-27/swagger.json
 
 let swaggerSpec = null;
-const parser = new swaggerParser();
-
-const test_array = { "GET /opa": ["1"], "POST /opa": ["2"], "PUT /opa": ["3"] };
+const parser = new SwaggerParser();
 
 let apiOperationsList = [];
 
@@ -46,27 +38,19 @@ parser.validate(swaggerSpecUrl, (err, api) => {
   swaggerSpec = api;
   apiOperationsList = swsTestUtils.generateApiOpList(swaggerSpec);
 
-  describe("API core test", function () {
-    this.timeout(15000);
-
+  describe("API core test", () => {
     let appSpecTest = null;
     let apiSpecTest = null;
 
     let apiStatsInitial = null;
-    const apiStatsCurrent = null;
-    const apiLastErrorsInitial = null;
-    const apiLastErrorsCurrent = null;
-
-    const client_error_id = cuid();
-    const server_error_id = cuid();
 
     describe("Initialize", () => {
       it("should initialize spectest app", (done) => {
         supertest(swsTestFixture.SWS_SPECTEST_DEFAULT_URL)
           .get(swsTestFixture.SWS_TEST_STATS_API)
           .expect(200)
-          .end((err, res) => {
-            if (err) {
+          .end((err1, res) => {
+            if (err1) {
               if (res && res.status === 403) {
                 apiSpecTest = supertest
                   .agent(swsTestFixture.SWS_TEST_DEFAULT_URL)
@@ -74,7 +58,8 @@ parser.validate(swaggerSpecUrl, (err, api) => {
                 done();
               } else {
                 process.env.SWS_SPECTEST_URL = swaggerSpecUrl;
-                appSpecTest = require("../examples/spectest/spectest");
+                // eslint-disable-next-line global-require
+                appSpecTest = require("../examples/spectest/spectest.js");
                 apiSpecTest = supertest(
                   `http://localhost:${appSpecTest.app.get("port")}`,
                 );
@@ -92,8 +77,8 @@ parser.validate(swaggerSpecUrl, (err, api) => {
           .get(swsTestFixture.SWS_TEST_STATS_API)
           .query({ fields: "apidefs,apistats" })
           .expect(200)
-          .end((err, res) => {
-            if (err) return done(err);
+          .end((err1, res) => {
+            if (err1) return done(err1);
 
             res.body.should.not.be.empty;
             apiStatsInitial = res.body;
@@ -108,7 +93,8 @@ parser.validate(swaggerSpecUrl, (err, api) => {
         const basePath = swsTestUtils.getApiBasePath(swaggerSpec);
 
         // getApiFullPath
-        for (const path in swaggerSpec.paths) {
+        // eslint-disable-next-line no-restricted-syntax
+        for (const path of Object.keys(swaggerSpec.paths)) {
           const pathDef = swaggerSpec.paths[path];
 
           // Create full path
@@ -123,7 +109,7 @@ parser.validate(swaggerSpecUrl, (err, api) => {
             "head",
             "patch",
           ];
-          for (let i = 0; i < operations.length; i++) {
+          for (let i = 0; i < operations.length; i += 1) {
             const op = operations[i];
             if (op in pathDef) {
               const opDef = pathDef[op];
@@ -236,8 +222,8 @@ parser.validate(swaggerSpecUrl, (err, api) => {
               path: apiop.path,
             })
             .expect(200)
-            .end((err, res) => {
-              if (err) return done(err);
+            .end((err1, res) => {
+              if (err1) return done(err1);
 
               res.body.should.not.be.empty;
 
@@ -300,8 +286,8 @@ parser.validate(swaggerSpecUrl, (err, api) => {
               path: apiop.path,
             })
             .expect(200)
-            .end((err, res) => {
-              if (err) return done(err);
+            .end((err1, res) => {
+              if (err1) return done(err1);
 
               res.body.should.not.be.empty;
 
@@ -394,8 +380,8 @@ parser.validate(swaggerSpecUrl, (err, api) => {
           .get(swsTestFixture.SWS_TEST_METRICS_API)
           .expect(200)
           .expect("Content-Type", /plain/)
-          .end((err, res) => {
-            if (err) return done(err);
+          .end((err1, res) => {
+            if (err1) return done(err1);
 
             res.text.should.not.be.empty;
 
@@ -407,5 +393,6 @@ parser.validate(swaggerSpecUrl, (err, api) => {
     });
   });
 
+  // eslint-disable-next-line no-undef
   run();
 });

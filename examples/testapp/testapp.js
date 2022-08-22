@@ -45,20 +45,22 @@ const swaggerSpec = require("./petstore.json");
 // Testing validation of 3rd-party API spec
 const parser = new SwaggerParser();
 
-parser.validate(swaggerSpec, (err) => {
+parser.validate(swaggerSpec, async (err) => {
   if (!err) {
     debug("Success validating swagger file!");
     // swaggerSpec = api;
 
     // Enable swagger-stats middleware
     app.use(
-      swStats.getMiddleware({
+      await swStats.getMiddleware({
         name: "swagger-stats-testapp",
         version: "0.99.2",
         timelineBucketDuration: tlBucket,
         uriPath: "/swagger-stats",
         swaggerSpec,
         elasticsearch: "http://127.0.0.1:9200",
+        MONGO_URL: "127.0.0.1:27027",
+        SWAGGER_STATS_MONGO_DB: "swagger-stats",
       }),
     );
 
