@@ -1,22 +1,14 @@
-const util = require("util");
 const chai = require("chai");
 
 chai.should();
-const { expect } = chai;
 const supertest = require("supertest");
 const request = require("request");
 const cuid = require("cuid");
 
-const Q = require("q");
-const http = require("http");
-
 // We will use it to store expected values
 const debug = require("debug")("swstest:auth");
-const swsReqResStats = require("../lib/swsReqResStats");
-const swsUtil = require("../lib/swsUtil");
 
-const swsTestFixture = require("./testfixture");
-const swsTestUtils = require("./testutils");
+const swsTestFixture = require("./testfixture.js");
 
 const swaggerSpecUrl = "./examples/spectest/petstore.yaml"; // Default
 
@@ -26,14 +18,10 @@ let apiSpecTest = null;
 const elasticURL = "http://127.0.0.1:9200";
 const indexTemplate = require("../schema/elasticsearch/api_index_template.json");
 
-const test_request_id = cuid();
-
-function isNonEmptyString(str) {
-  return typeof str === "string" && !!str.trim();
-}
+const testRequestId = cuid();
 
 setImmediate(() => {
-  describe("Elasticsearch test", function () {
+  describe("Elasticsearch test", () => {
     this.timeout(15000);
 
     describe("Initialize", () => {
@@ -52,7 +40,8 @@ setImmediate(() => {
                 process.env.SWS_SPECTEST_URL = swaggerSpecUrl;
                 process.env.SWS_ELASTIC = elasticURL;
                 process.env.SWS_ELASTIC_INDEX_PREFIX = "swaggerstats-";
-                appSpecTest = require("../examples/spectest/spectest");
+                // eslint-disable-next-line global-require
+                appSpecTest = require("../examples/spectest/spectest.js");
                 const dest = `http://localhost:${appSpecTest.app.get("port")}`;
                 apiSpecTest = supertest(dest);
                 setTimeout(done, 2000);
@@ -85,20 +74,20 @@ setImmediate(() => {
         );
       });
 
-      it("should send test requests", function (done) {
+      it("should send test requests", (done) => {
         this.timeout(10000);
 
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < 10; i += 1) {
           apiSpecTest
             .get("/v2/mockapi")
-            .set("x-ses-test-id", test_request_id)
+            .set("x-ses-test-id", testRequestId)
             .set("x-ses-test-seq", i)
             .set(
               "x-sws-res",
               '{"code":"200","message":"TEST","delay":"50","payloadsize":"5"}',
             )
             .expect(200)
-            .end((err, res) => {
+            .end((err) => {
               if (err) return done(err);
             });
         }
@@ -111,7 +100,7 @@ setImmediate(() => {
           size: 100,
           query: {
             term: {
-              "http.request.headers.x-ses-test-id": test_request_id,
+              "http.request.headers.x-ses-test-id": testRequestId,
             },
           },
         };
@@ -137,5 +126,6 @@ setImmediate(() => {
     });
   });
 
+  // eslint-disable-next-line no-undef
   run();
 });

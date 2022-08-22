@@ -149,7 +149,6 @@ setImmediate(() => {
             if (err) return done(err);
 
             res.body.should.not.be.empty;
-            console.log("res.body :>> ", res.body);
             apiStatsCurrent = res.body;
             done();
           });
@@ -456,5 +455,6 @@ setImmediate(() => {
     });
   });
 
+  // eslint-disable-next-line no-undef
   run();
 });
