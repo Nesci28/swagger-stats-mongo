@@ -1,103 +1,129 @@
-'use strict';
-
-var http = require('http');
-var path = require('path');
-var debug = require('debug')('sws:authtest');
+const http = require("http");
+const path = require("path");
+const debug = require("debug")("sws:authtest");
 
 // Prometheus Client
-const promClient = require('prom-client');
-const collectDefaultMetrics = promClient.collectDefaultMetrics;
+const promClient = require("prom-client");
+const SwaggerParser = require("swagger-parser");
+const { MongoMemoryServer } = require("mongodb-memory-server");
+
+// Express and middlewares
+const express = require("express");
+const expressBodyParser = require("body-parser");
+const swStats = require("../../lib/index.js"); // require('swagger-stats');
+
+const { collectDefaultMetrics } = promClient;
 // Probe every 1 second
 collectDefaultMetrics({ timeout: 1000 });
 
 // Server
-var server = null;
+let server = null;
 
-// Express and middlewares
-var express = require('express');
-var expressBodyParser = require('body-parser');
-
-var swStats = require('../../lib');    // require('swagger-stats');
-
-var app = module.exports = express();
+// eslint-disable-next-line no-multi-assign
+const app = (module.exports = express());
 app.use(expressBodyParser.json());
 app.use(expressBodyParser.urlencoded({ extended: true }));
 
 // JSON formatting
-app.set('json spaces', 2);
-app.set('json replacer', null);
+app.set("json spaces", 2);
+app.set("json replacer", null);
 
 // all environments
-app.set('port', process.env.PORT || 3050);
+app.set("port", process.env.PORT || 3050);
 
 // Suppress cache on the GET API responses
-app.disable('etag');
+app.disable("etag");
 
-app.get('/', function(req,res) {
-    res.redirect('/swagger-stats/');
+app.get("/", (req, res) => {
+  res.redirect("/swagger-stats/");
 });
 
 // Return Prometheus metrics from prom-client
-app.get('/metrics', function(req,res) {
-    res.status(200).set('Content-Type', 'text/plain');
-    Promise.resolve(promClient.register.metrics()).then( (x) => {
-        res.end(x);
-    });
+app.get("/metrics", (req, res) => {
+  res.status(200).set("Content-Type", "text/plain");
+  Promise.resolve(promClient.register.metrics()).then((x) => {
+    res.end(x);
+  });
 });
 
-var specLocation = path.join(__dirname, 'petstore.json');
+const specLocation = path.join(__dirname, "petstore.json");
 
-var maxAge = 900;
-if( process.env.SWS_AUTHTEST_MAXAGE ){
-    maxAge = parseInt(process.env.SWS_AUTHTEST_MAXAGE);
+let maxAge = 900;
+if (process.env.SWS_AUTHTEST_MAXAGE) {
+  maxAge = +process.env.SWS_AUTHTEST_MAXAGE;
 }
 
-debug('Loading Swagger Spec from ' + specLocation );
+debug(`Loading Swagger Spec from ${specLocation}`);
 
-var swaggerSpec = require( specLocation );
+// eslint-disable-next-line import/no-dynamic-require
+const swaggerSpec = require(specLocation);
 
-// Use swagger-stats middleware with authentication enabled
-app.use(swStats.getMiddleware({
-    name: 'swagger-stats-authtest',
-    version: '0.99.2',
-    hostname: "hostname",
-    ip: "127.0.0.1",
-    swaggerSpec:swaggerSpec,
-    swaggerOnly: true,
-    uriPath: '/swagger-stats',
-    durationBuckets: [10, 25, 50, 100, 200],
-    requestSizeBuckets: [10, 25, 50, 100, 200],
-    responseSizeBuckets: [10, 25, 50, 100, 200],
-    apdexThreshold: 100,
-    onResponseFinish: function(req,res,rrr){
-        debug('onResponseFinish: %s', JSON.stringify(rrr));
-    },
-    authentication: true,
-    sessionMaxAge: maxAge,
-    onAuthenticate: function(req,username,password){
-        // simple check for username and password
-        if(username==='swagger-stats') {
-            return ((username === 'swagger-stats') && (password === 'swagger-stats'));
-        } else if(username==='swagger-promise'){
-            return new Promise(function(resolve) {
-                setTimeout(function(){
-                    resolve((username === 'swagger-promise') && (password === 'swagger-promise'));
-                }, 1000);
+const parser = new SwaggerParser();
+
+parser.validate(swaggerSpec, async (err) => {
+  if (!err) {
+    debug("Success validating swagger file!");
+
+    await MongoMemoryServer.create({
+      instance: {
+        port: 27027,
+        dbName: "swagger-stats",
+      },
+    });
+
+    app.use(
+      await swStats.getMiddleware({
+        name: "swagger-stats-authtest",
+        version: "0.99.2",
+        hostname: "hostname",
+        ip: "127.0.0.1",
+        swaggerSpec,
+        swaggerOnly: true,
+        uriPath: "/swagger-stats",
+        durationBuckets: [10, 25, 50, 100, 200],
+        requestSizeBuckets: [10, 25, 50, 100, 200],
+        responseSizeBuckets: [10, 25, 50, 100, 200],
+        apdexThreshold: 100,
+        MONGO_URL: "127.0.0.1:27027",
+        SWAGGER_STATS_MONGO_DB: "swagger-stats",
+        onResponseFinish(req, res, rrr) {
+          debug("onResponseFinish: %s", JSON.stringify(rrr));
+        },
+        authentication: true,
+        sessionMaxAge: maxAge,
+        onAuthenticate(req, username, password) {
+          // simple check for username and password
+          if (username === "swagger-stats") {
+            return username === "swagger-stats" && password === "swagger-stats";
+          }
+          if (username === "swagger-promise") {
+            return new Promise((resolve) => {
+              setTimeout(() => {
+                resolve(
+                  username === "swagger-promise" &&
+                    password === "swagger-promise",
+                );
+              }, 1000);
             });
-        }
-        return false;
-    }
-}));
+          }
+          return false;
+        },
+      }),
+    );
+  }
 
+  // Implement mock API
+  app.use(mockApiImplementation);
 
-// Implement mock API
-app.use(mockApiImplementation);
-
-// Setup server
-server = http.createServer(app);
-server.listen(app.get('port'));
-debug('Server started on port ' + app.get('port') + ' http://localhost:'+app.get('port'));
-
+  // Setup server
+  server = http.createServer(app);
+  server.listen(app.get("port"));
+  debug(
+    `Server started on port ${app.get("port")} http://localhost:${app.get(
+      "port",
+    )}`,
+  );
+});
 
 // Mock implementation of any API request
 // Supports the following parameters in x-sws-res header:
@@ -106,51 +132,49 @@ debug('Server started on port ' + app.get('port') + ' http://localhost:'+app.get
 //             delay:<delay to respond>,
 //             payloadsize:<size of payload JSON to generate>
 //           }
-function mockApiImplementation(req,res,next){
+function mockApiImplementation(req, res) {
+  let code = 500;
+  let message = "MOCK API RESPONSE";
+  let delay = 0;
+  let payloadsize = 0;
 
-    var code = 500;
-    var message = "MOCK API RESPONSE";
-    var delay = 0;
-    var payloadsize = 0;
+  // get header
+  const hdrSwsRes = req.header("x-sws-res");
 
-    // get header
-    var hdrSwsRes = req.header('x-sws-res');
+  if (typeof hdrSwsRes !== "undefined") {
+    const swsRes = JSON.parse(hdrSwsRes);
+    if ("code" in swsRes) code = swsRes.code;
+    if ("message" in swsRes) message = swsRes.message;
+    if ("delay" in swsRes) delay = swsRes.delay;
+    if ("payloadsize" in swsRes) payloadsize = swsRes.payloadsize;
+  }
 
-    if(typeof hdrSwsRes !== 'undefined'){
-        var swsRes = JSON.parse(hdrSwsRes);
-        if( 'code' in swsRes ) code = swsRes.code;
-        if( 'message' in swsRes ) message = swsRes.message;
-        if( 'delay' in swsRes ) delay = swsRes.delay;
-        if( 'payloadsize' in swsRes ) payloadsize = swsRes.payloadsize;
-    }
-
-    if( delay > 0 ){
-        setTimeout(function(){
-            mockApiSendResponse(res,code,message,payloadsize);
-        },delay);
-    }else{
-        mockApiSendResponse(res,code,message,payloadsize);
-    }
+  if (delay > 0) {
+    setTimeout(() => {
+      mockApiSendResponse(res, code, message, payloadsize);
+    }, delay);
+  } else {
+    mockApiSendResponse(res, code, message, payloadsize);
+  }
 }
 
-function mockApiSendResponse(res,code,message,payloadsize){
-    if(payloadsize<=0){
-        res.status(code).send(message);
-    }else{
-        // generate dummy payload of approximate size
-        var dummyPayload = [];
-        var adjSize = payloadsize-4;
-        if(adjSize<=0) adjSize = 1;
-        var str = '';
-        for(var i=0;i<adjSize;i++) str += 'a';
-        dummyPayload.push(str);
-        res.status(code).json(dummyPayload);
-    }
+function mockApiSendResponse(res, code, message, payloadsize) {
+  if (payloadsize <= 0) {
+    res.status(code).send(message);
+  } else {
+    // generate dummy payload of approximate size
+    const dummyPayload = [];
+    let adjSize = payloadsize - 4;
+    if (adjSize <= 0) adjSize = 1;
+    let str = "";
+    for (let i = 0; i < adjSize; i += 1) str += "a";
+    dummyPayload.push(str);
+    res.status(code).json(dummyPayload);
+  }
 }
 
-process.on('unhandledRejection', function(error) {
-    debug('unhandledRejection', error.message, error.stack);
+process.on("unhandledRejection", (error) => {
+  debug("unhandledRejection", error.message, error.stack);
 });
-
 
 module.exports.app = app;

@@ -115,6 +115,7 @@
         "@hapi/hapi": "^20.1.2",
         "@hapi/inert": "^6.0.3",
         "@okidoo/eslint-config": "^1.0.24",
+        "@okidoo/git-config": "^1.0.0",
         "@types/mongodb-memory-server": "^2.3.0",
         "@typescript-eslint/eslint-plugin": "^5.33.1",
         "@typescript-eslint/parser": "^5.33.1",

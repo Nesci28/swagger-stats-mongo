@@ -1,21 +1,10 @@
-const util = require("util");
+/* eslint-disable no-unused-expressions */
 const chai = require("chai");
 
 chai.should();
-const { expect } = chai;
 const supertest = require("supertest");
-const cuid = require("cuid");
 
-const Q = require("q");
-const http = require("http");
-
-// We will use it to store expected values
-const debug = require("debug")("swstest:auth");
-const swsReqResStats = require("../lib/swsReqResStats");
-const swsUtil = require("../lib/swsUtil");
-
-const swsTestFixture = require("./testfixture");
-const swsTestUtils = require("./testutils");
+const swsTestFixture = require("./testfixture.js");
 
 const swaggerSpecUrl = "./examples/authtest/petstore3.yaml"; // Default
 
@@ -28,7 +17,7 @@ function isNonEmptyString(str) {
   return typeof str === "string" && !!str.trim();
 }
 
-function parseSetCookie(setCookieValue, options) {
+function parseSetCookie(setCookieValue) {
   const parts = setCookieValue.split(";").filter(isNonEmptyString);
   const nameValue = parts.shift().split("=");
   const name = nameValue.shift();
@@ -41,17 +30,17 @@ function parseSetCookie(setCookieValue, options) {
   parts.forEach((part) => {
     const sides = part.split("=");
     const key = sides.shift().trimLeft().toLowerCase();
-    const value = sides.join("=");
-    if (key == "expires") {
-      cookie.expires = new Date(value);
-    } else if (key == "max-age") {
+    const v = sides.join("=");
+    if (key === "expires") {
+      cookie.expires = new Date(v);
+    } else if (key === "max-age") {
       cookie.maxAge = parseInt(value, 10);
-    } else if (key == "secure") {
+    } else if (key === "secure") {
       cookie.secure = true;
-    } else if (key == "httponly") {
+    } else if (key === "httponly") {
       cookie.httpOnly = true;
     } else {
-      cookie[key] = value;
+      cookie[key] = v;
     }
   });
 
@@ -59,9 +48,7 @@ function parseSetCookie(setCookieValue, options) {
 }
 
 setImmediate(() => {
-  describe("Authentication test", function () {
-    this.timeout(15000);
-
+  describe("Authentication test", () => {
     let sessionIdCookie;
 
     describe("Initialize", () => {
@@ -69,11 +56,12 @@ setImmediate(() => {
         supertest(swsTestFixture.SWS_AUTHTEST_DEFAULT_URL)
           .get(swsTestFixture.SWS_TEST_STATS_API)
           .expect(403)
-          .end((err, res) => {
+          .end((err) => {
             if (err) {
               process.env.SWS_AUTHTEST_MAXAGE = 2;
               process.env.SWS_SPECTEST_URL = swaggerSpecUrl;
-              appAuthTest = require("../examples/authtest/authtest");
+              // eslint-disable-next-line global-require
+              appAuthTest = require("../examples/authtest/authtest.js");
               const dest = `http://localhost:${appAuthTest.app.get("port")}`;
               apiAuthTest = supertest(dest);
               setTimeout(done, 1000);
@@ -82,14 +70,15 @@ setImmediate(() => {
               done();
             }
           });
-      });
+      }).timeout(5000);
 
       it("should get 403 response for /stats", (done) => {
         apiAuthTest
           .get(swsTestFixture.SWS_TEST_STATS_API)
           .expect(403)
-          .end((err, res) => {
+          .end((err) => {
             if (err) return done(err);
+
             done();
           });
       });
@@ -98,7 +87,7 @@ setImmediate(() => {
         apiAuthTest
           .get(swsTestFixture.SWS_TEST_METRICS_API)
           .expect(403)
-          .end((err, res) => {
+          .end((err) => {
             if (err) return done(err);
 
             done();
@@ -110,7 +99,7 @@ setImmediate(() => {
           .get(swsTestFixture.SWS_TEST_STATS_API)
           .auth("wrong", "wrong")
           .expect(403)
-          .end((err, res) => {
+          .end((err) => {
             if (err) return done(err);
             done();
           });
@@ -155,7 +144,7 @@ setImmediate(() => {
             '{"code":"200","message":"TEST","delay":"50","payloadsize":"5"}',
           )
           .expect(200)
-          .end((err, res) => {
+          .end((err) => {
             if (err) return done(err);
 
             done();
@@ -167,7 +156,7 @@ setImmediate(() => {
           .get(swsTestFixture.SWS_LOGOUT_API)
           .set("Cookie", [`sws-session-id=${sessionIdCookie}`])
           .expect(200)
-          .end((err, res) => {
+          .end((err) => {
             if (err) return done(err);
 
             done();
@@ -179,7 +168,7 @@ setImmediate(() => {
           .get(swsTestFixture.SWS_TEST_STATS_API)
           .set("Cookie", [`sws-session-id=${sessionIdCookie}`])
           .expect(403)
-          .end((err, res) => {
+          .end((err) => {
             if (err) return done(err);
 
             done();
@@ -191,7 +180,7 @@ setImmediate(() => {
           .get(swsTestFixture.SWS_TEST_STATS_API)
           .auth("swagger-promise", "wrong")
           .expect(403)
-          .end((err, res) => {
+          .end((err) => {
             if (err) return done(err);
             done();
           });
@@ -242,7 +231,7 @@ setImmediate(() => {
           .get(swsTestFixture.SWS_TEST_STATS_API)
           .set("Cookie", [`sws-session-id=${sessionIdCookie}`])
           .expect(403)
-          .end((err, res) => {
+          .end((err) => {
             if (err) return done(err);
 
             done();
@@ -254,7 +243,7 @@ setImmediate(() => {
           .get(swsTestFixture.SWS_TEST_METRICS_API)
           .auth("wrong", "wrong")
           .expect(403)
-          .end((err, res) => {
+          .end((err) => {
             if (err) return done(err);
 
             done();
@@ -266,7 +255,7 @@ setImmediate(() => {
           .get(swsTestFixture.SWS_TEST_METRICS_API)
           .auth("swagger-stats", "swagger-stats")
           .expect(200)
-          .end((err, res) => {
+          .end((err) => {
             if (err) return done(err);
 
             done();
@@ -321,5 +310,6 @@ setImmediate(() => {
 */
   });
 
+  // eslint-disable-next-line no-undef
   run();
 });
