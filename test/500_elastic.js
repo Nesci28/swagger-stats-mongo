@@ -15,15 +15,13 @@ const swaggerSpecUrl = "./examples/spectest/petstore.yaml"; // Default
 let appSpecTest = null;
 let apiSpecTest = null;
 
-const elasticURL = "http://127.0.0.1:9200";
+const elasticURL = "http://swagger-stats-elasticsearch:9200";
 const indexTemplate = require("../schema/elasticsearch/api_index_template.json");
 
 const testRequestId = cuid();
 
 setImmediate(() => {
   describe("Elasticsearch test", () => {
-    this.timeout(15000);
-
     describe("Initialize", () => {
       it("should initialize spectest  app", (done) => {
         supertest(swsTestFixture.SWS_SPECTEST_DEFAULT_URL)
@@ -51,7 +49,7 @@ setImmediate(() => {
               done();
             }
           });
-      });
+      }).timeout(3000);
 
       it("should get index template from Elasticsearch ", (done) => {
         // Check if there is a template
@@ -75,8 +73,6 @@ setImmediate(() => {
       });
 
       it("should send test requests", (done) => {
-        this.timeout(10000);
-
         for (let i = 0; i < 10; i += 1) {
           apiSpecTest
             .get("/v2/mockapi")
@@ -92,7 +88,7 @@ setImmediate(() => {
             });
         }
         setTimeout(done, 5100);
-      });
+      }).timeout(10000);
 
       it("should find test request in Elasticsearch", (done) => {
         const searchBody = {
