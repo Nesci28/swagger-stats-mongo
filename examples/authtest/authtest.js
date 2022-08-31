@@ -94,7 +94,9 @@ parser.validate(swaggerSpec, async (err) => {
         onAuthenticate(req, username, password) {
           // simple check for username and password
           if (username === "swagger-stats") {
-            return username === "swagger-stats" && password === "swagger-stats";
+            const isAuth =
+              username === "swagger-stats" && password === "swagger-stats";
+            return isAuth;
           }
           if (username === "swagger-promise") {
             return new Promise((resolve) => {
@@ -106,6 +108,7 @@ parser.validate(swaggerSpec, async (err) => {
               }, 1000);
             });
           }
+
           return false;
         },
       }),

@@ -120,7 +120,7 @@ setImmediate(() => {
 
             done();
           });
-      });
+      }).timeout(10000);
 
       it("should get statistics values", (done) => {
         apiAuthTest
@@ -224,7 +224,7 @@ setImmediate(() => {
         setTimeout(() => {
           done();
         }, 2000);
-      });
+      }).timeout(2500);
 
       it("should not get statistics after session expired", (done) => {
         apiAuthTest
