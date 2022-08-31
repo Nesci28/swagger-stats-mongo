@@ -3,32 +3,43 @@
  * Created by sv2 on 2/18/17.
  * Errors stats
  */
+import { Response } from "express";
 
-const swsUtil = require("./swsUtil.js");
+import { StatusCodeCount } from "./interfaces/status-code-count.interface";
+import { SwsUtil } from "./swsUtil";
 
-class SwsErrors {
-  constructor() {
-    // Store counts per each error code
-    this.statuscode_count = {};
+interface StatsResponse {
+  statuscode: StatusCodeCount;
+  topnotfound: {
+    [key: string]: number;
+  };
+  topservererror: {
+    [key: string]: number;
+  };
+}
 
-    // Store Top not found path
-    this.top_not_found = {};
+export class SwsErrors {
+  // Store counts per each error code
+  private statuscode_count: StatusCodeCount = {};
 
-    // Store Top server error path
-    this.top_server_error = {};
-  }
+  // Store Top not found path
+  private top_not_found: { [key: string]: number } = {};
 
-  getStats() {
-    return {
+  // Store Top server error path
+  private top_server_error: { [key: string]: number } = {};
+
+  public getStats(): StatsResponse {
+    const res = {
       statuscode: this.statuscode_count,
       topnotfound: this.top_not_found,
       topservererror: this.top_server_error,
     };
+    return res;
   }
 
   // Add information about error
-  countResponse(res) {
-    if (!swsUtil.isError(res.statusCode)) return;
+  public countResponse(res: Response & { _swsReq: any }): void {
+    if (!SwsUtil.isError(res.statusCode)) return;
 
     // Increase count by code
     if (!(res.statusCode in this.statuscode_count)) {
@@ -44,7 +55,7 @@ class SwsErrors {
   }
 
   // Check if this qualifies as longest request, and store is yes
-  countPathHit(path, store) {
+  private countPathHit(path: string, store: Record<string, number>): void {
     if (!(path in store)) {
       // eslint-disable-next-line no-param-reassign
       store[path] = 0;
@@ -53,5 +64,3 @@ class SwsErrors {
     store[path] += 1;
   }
 }
-
-module.exports = SwsErrors;

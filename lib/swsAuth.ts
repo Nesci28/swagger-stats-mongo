@@ -1,18 +1,19 @@
-/* eslint-disable @typescript-eslint/explicit-member-accessibility */
-const { v1: uuidv1 } = require("uuid");
-const Cookies = require("cookies");
-const basicAuth = require("basic-auth");
-const swsSettings = require("./swsSettings.js");
+import basicAuth from "basic-auth";
+import Cookies from "cookies";
+import { Request, Response } from "express";
+import { FindOneResult } from "monk";
+import { v1 } from "uuid";
 
-/* Authentication */
-class SwsAuth {
-  constructor(swsMongo) {
-    this.swsMongo = swsMongo;
-    this.sessionIDs = {};
-    this.expireIntervalId = null;
-  }
+import { Session } from "./interfaces/session.interface";
+import { SwsMongo } from "./swsMongo";
+import swsSettings from "./swsSettings";
 
-  async storeSessionID(sid) {
+export class SwsAuth {
+  private expireIntervalId: any;
+
+  constructor(private readonly swsMongo: SwsMongo) {}
+
+  public async storeSession(sid: string): Promise<void> {
     const tsSec = Date.now() + swsSettings.sessionMaxAge * 1000;
     await this.swsMongo.insertSession({
       sid,
@@ -23,25 +24,28 @@ class SwsAuth {
     // debug('Session ID updated: %s=%d', sid,tssec);
     if (!this.expireIntervalId) {
       this.expireIntervalId = setInterval(async () => {
-        await this.expireSessionIDs();
+        await this.expireSessions();
       }, 500);
     }
   }
 
-  async patchSessionId(sid, ms) {
+  public async patchSession(
+    sid: string,
+    ms: number,
+  ): Promise<FindOneResult<Session>> {
     const res = await this.swsMongo.patchBySidSession(sid, ms);
     return res;
   }
 
-  async removeSessionID(sid) {
+  public async removeSession(sid: string): Promise<FindOneResult<Session>> {
     const res = await this.swsMongo.archiveByIdSessions(sid);
     return res;
   }
 
   // If authentication is enabled, executed periodically and expires old session IDs
-  async expireSessionIDs() {
+  public async expireSessions(): Promise<void> {
     const tsSec = Date.now();
-    const archiveByIdSessionPromises = [];
+    const archiveByIdSessionPromises: Promise<any>[] = [];
     const sessions = await this.swsMongo.getAllSessions();
     // eslint-disable-next-line no-restricted-syntax
     for (const session of sessions) {
@@ -56,7 +60,7 @@ class SwsAuth {
     await Promise.all(archiveByIdSessionPromises);
   }
 
-  async processAuth(req, res) {
+  public async processAuth(req: Request, res: Response): Promise<boolean> {
     if (!swsSettings.authentication) {
       return true;
     }
@@ -74,7 +78,7 @@ class SwsAuth {
       if (session && !session.archived) {
         // renew it
         // sessionIDs[sId] = Date.now();
-        await this.patchSessionId(sId, Date.now());
+        await this.patchSession(sId, Date.now());
         cookies.set("sws-session-id", sId, {
           path: swsSettings.basePath + swsSettings.uriPath,
           maxAge: swsSettings.sessionMaxAge * 1000,
@@ -96,7 +100,7 @@ class SwsAuth {
       "pass" in authInfo
     ) {
       if (typeof swsSettings.onAuthenticate === "function") {
-        let onAuthResult = null;
+        let onAuthResult;
         try {
           onAuthResult = await swsSettings.onAuthenticate(
             req,
@@ -113,8 +117,8 @@ class SwsAuth {
           // Session is only for stats requests
           if (req.url.startsWith(swsSettings.pathStats)) {
             // Generate session id
-            const sessid = uuidv1();
-            await this.storeSessionID(sessid);
+            const sessid = v1();
+            await this.storeSession(sessid);
             // Set session cookie with expiration in 15 min
             cookies.set("sws-session-id", sessid, {
               path: swsSettings.basePath + swsSettings.uriPath,
@@ -137,16 +141,14 @@ class SwsAuth {
     return false;
   }
 
-  async processLogout(req, res) {
+  public async processLogout(req: Request, res: Response): Promise<void> {
     const cookies = new Cookies(req, res);
     const sessionIdCookie = cookies.get("sws-session-id");
     if (sessionIdCookie !== undefined && sessionIdCookie !== null) {
-      await this.removeSessionID(sessionIdCookie);
+      await this.removeSession(sessionIdCookie);
       cookies.set("sws-session-id"); // deletes cookie
     }
     res.statusCode = 200;
     res.end("Logged out");
   }
 }
-
-module.exports = SwsAuth;

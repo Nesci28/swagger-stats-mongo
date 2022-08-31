@@ -2,92 +2,109 @@
 /**
  * ElasticSearch Emitter. Store Request/Response records in Elasticsearch
  */
+import Debug from "debug";
+import moment from "moment";
+import request from "request";
 
-const request = require("request");
-
-const debug = require("debug")("sws:elastic");
-const moment = require("moment");
-const swsUtil = require("./swsUtil.js");
+import { SwsUtil } from "./swsUtil";
 
 const indexTemplate = require("../schema/elasticsearch/api_index_template.json");
 const indexTemplate7X = require("../schema/elasticsearch/api_index_template_7x.json");
 
 const ES_MAX_BUFF = 50;
 
+interface Options {
+  url: string;
+  json: boolean;
+  key: string;
+  cert: string;
+  auth?: {
+    username: string;
+    password: string;
+  };
+}
+
 // ElasticSearch Emitter. Store Request/Response records in Elasticsearch
-class SwsElasticEmitter {
-  constructor() {
-    // Options
-    this.options = null;
+export class SwsElasticEmitter {
+  private debug = Debug("sws:elastic");
 
-    this.es7 = true;
+  private options = null;
 
-    this.indexBuffer = "";
-    this.bufferCount = 0;
-    this.lastFlush = 0;
+  private es7 = true;
 
-    this.elasticURL = null;
-    this.elasticURLBulk = null;
-    this.elasticProto = null;
-    this.elasticHostname = null;
-    this.elasticPort = null;
+  private indexBuffer = "";
 
-    this.elasticUsername = null;
-    this.elasticPassword = null;
+  private bufferCount = 0;
 
-    this.elasticsearchCert = null;
-    this.elasticsearchKey = null;
+  private lastFlush = 0;
 
-    this.indexPrefix = "api-";
+  private elasticURL: string;
 
-    this.enabled = false;
-  }
+  private elasticURLBulk: string;
+
+  private elasticProto = null;
+
+  private elasticHostname = null;
+
+  private elasticPort = null;
+
+  private elasticUsername = null;
+
+  private elasticPassword = null;
+
+  private elasticsearchCert: string;
+
+  private elasticsearchKey: string;
+
+  private indexPrefix = "api-";
+
+  private enabled = false;
 
   // Initialize
-  initialize(swsOptions) {
+  public initialize(swsOptions): void {
     if (typeof swsOptions === "undefined") return;
     if (!swsOptions) return;
 
     this.options = swsOptions;
 
     // Set or detect hostname
-    if (!(swsUtil.supportedOptions.elasticsearch in swsOptions)) {
-      debug("Elasticsearch is disabled");
+    if (!(SwsUtil.supportedOptions.elasticsearch in swsOptions)) {
+      this.debug("Elasticsearch is disabled");
       return;
     }
 
-    this.elasticURL = swsOptions[swsUtil.supportedOptions.elasticsearch];
+    this.elasticURL = swsOptions[SwsUtil.supportedOptions.elasticsearch];
 
     if (!this.elasticURL) {
-      debug("Elasticsearch url is invalid");
+      this.debug("Elasticsearch url is invalid");
       return;
     }
 
     this.elasticURLBulk = `${this.elasticURL}/_bulk`;
 
-    if (swsUtil.supportedOptions.elasticsearchIndexPrefix in swsOptions) {
+    if (SwsUtil.supportedOptions.elasticsearchIndexPrefix in swsOptions) {
       this.indexPrefix =
-        swsOptions[swsUtil.supportedOptions.elasticsearchIndexPrefix];
+        swsOptions[SwsUtil.supportedOptions.elasticsearchIndexPrefix];
     }
 
-    if (swsUtil.supportedOptions.elasticsearchUsername in swsOptions) {
+    if (SwsUtil.supportedOptions.elasticsearchUsername in swsOptions) {
       this.elasticUsername =
-        swsOptions[swsUtil.supportedOptions.elasticsearchUsername];
+        swsOptions[SwsUtil.supportedOptions.elasticsearchUsername];
     }
 
-    if (swsUtil.supportedOptions.elasticsearchPassword in swsOptions) {
+    if (SwsUtil.supportedOptions.elasticsearchPassword in swsOptions) {
       this.elasticPassword =
-        swsOptions[swsUtil.supportedOptions.elasticsearchPassword];
+        swsOptions[SwsUtil.supportedOptions.elasticsearchPassword];
     }
 
-    if (swsUtil.supportedOptions.elasticsearchCert in swsOptions) {
+    if (SwsUtil.supportedOptions.elasticsearchCert in swsOptions) {
       this.elasticsearchCert =
-        swsOptions[swsUtil.supportedOptions.elasticsearchCert];
+        swsOptions[SwsUtil.supportedOptions.elasticsearchCert];
     }
 
-    if (swsUtil.supportedOptions.elasticsearchKey in swsOptions) {
+    if (SwsUtil.supportedOptions.elasticsearchKey in swsOptions) {
       this.elasticsearchKey =
-        swsOptions[swsUtil.supportedOptions.elasticsearchKey];
+        swsOptions[SwsUtil.supportedOptions.elasticsearchKey];
     }
 
     // Check / Initialize schema
@@ -97,26 +114,26 @@ class SwsElasticEmitter {
   }
 
   // initialize index template
-  initTemplate() {
+  public initTemplate(): void {
     const that = this;
 
     const requiredTemplateVersion = indexTemplate7X.version;
 
     // Check if there is a template
     const templateURL = `${this.elasticURL}/_template/template_api`;
-    const getOptionsVersion = {
+    const getOptionsVersion: Options = {
       url: this.elasticURL,
       json: true,
       key: this.elasticsearchKey,
       cert: this.elasticsearchCert,
     };
-    const getOptions = {
+    const getOptions: Options = {
       url: templateURL,
       json: true,
       key: this.elasticsearchKey,
       cert: this.elasticsearchCert,
     };
-    const putOptions = {
+    const putOptions: Options = {
       url: templateURL,
       json: indexTemplate7X,
       key: this.elasticsearchKey,
@@ -135,9 +152,7 @@ class SwsElasticEmitter {
 
     request.get(getOptionsVersion, (error1, _, body1) => {
       if (error1) {
-        debug("Error getting version:", JSON.stringify(error1));
-        // eslint-disable-next-line no-unused-expressions
-        that.enabled.false;
+        this.debug("Error getting version:", JSON.stringify(error1));
       } else {
         if (body1 && "version" in body1 && "number" in body1.version) {
           that.es7 = body1.version.number.startsWith("7");
@@ -149,7 +164,7 @@ class SwsElasticEmitter {
 
         request.get(getOptions, (error2, response2, body2) => {
           if (error2) {
-            debug("Error querying template:", JSON.stringify(error2));
+            this.debug("Error querying template:", JSON.stringify(error2));
           } else {
             let initializeNeeded = false;
 
@@ -169,7 +184,10 @@ class SwsElasticEmitter {
             if (initializeNeeded) {
               request.put(putOptions, (error3) => {
                 if (error3) {
-                  debug("Failed to update template:", JSON.stringify(error3));
+                  this.debug(
+                    "Failed to update template:",
+                    JSON.stringify(error3),
+                  );
                 }
               });
             }
@@ -180,7 +198,7 @@ class SwsElasticEmitter {
   }
 
   // Update timeline and stats per tick
-  tick(ts) {
+  public tick(ts): void {
     // Flush if buffer is not empty and not flushed in more than 1 second
     if (this.bufferCount > 0 && ts - this.lastFlush >= 1000) {
       this.flush();
@@ -188,13 +206,13 @@ class SwsElasticEmitter {
   }
 
   // Pre-process RRR
-  preProcessRecord(rrr) {
+  private preProcessRecord(rrr): void {
     // handle custom attributes
     if ("attrs" in rrr) {
       const { attrs } = rrr;
       // eslint-disable-next-line no-restricted-syntax
       for (const attrname of Object.keys(attrs)) {
-        attrs[attrname] = swsUtil.swsStringValue(attrs[attrname]);
+        attrs[attrname] = SwsUtil.swsStringValue(attrs[attrname]);
       }
     }
 
@@ -202,13 +220,13 @@ class SwsElasticEmitter {
       const intattrs = rrr.attrsint;
       // eslint-disable-next-line no-restricted-syntax
       for (const intattrname of Object.keys(intattrs)) {
-        intattrs[intattrname] = swsUtil.swsNumValue(intattrs[intattrname]);
+        intattrs[intattrname] = SwsUtil.swsNumValue(intattrs[intattrname]);
       }
     }
   }
 
   // Index Request Response Record
-  processRecord(rrr) {
+  public processRecord(rrr): void {
     if (!this.enabled) {
       return;
     }
@@ -219,7 +237,9 @@ class SwsElasticEmitter {
     const indexName =
       this.indexPrefix + moment(rrr["@timestamp"]).utc().format("YYYY.MM.DD");
 
-    let meta = { index: { _index: indexName, _id: rrr.id } };
+    let meta: { index: { _index: string; _id: string; _type?: string } } = {
+      index: { _index: indexName, _id: rrr.id },
+    };
     if (!this.es7) {
       meta = { index: { _index: indexName, _type: "api", _id: rrr.id } };
     }
@@ -235,7 +255,7 @@ class SwsElasticEmitter {
     }
   }
 
-  flush() {
+  private flush(): void {
     if (!this.enabled) {
       return;
     }
@@ -261,10 +281,14 @@ class SwsElasticEmitter {
 
     request.post(options, (error, response) => {
       if (error) {
-        debug("Indexing Error:", JSON.stringify(error));
+        this.debug("Indexing Error:", JSON.stringify(error));
       }
       if (response && "statusCode" in response && response.statusCode !== 200) {
-        debug("Indexing Error: %d %s", response.statusCode, response.message);
+        this.debug(
+          "Indexing Error: %d %s",
+          response.statusCode,
+          response.message,
+        );
       }
     });
 
@@ -272,5 +296,3 @@ class SwsElasticEmitter {
     this.bufferCount = 0;
   }
 }
-
-module.exports = SwsElasticEmitter;

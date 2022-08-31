@@ -1,8 +1,26 @@
 /* eslint-disable @typescript-eslint/explicit-member-accessibility */
+import monk, {
+  FindOneResult,
+  FindResult,
+  ICollection,
+  InsertResult,
+} from "monk";
 
-const monk = require("monk");
+import { Session } from "./interfaces/session.interface";
 
-class SwsMongo {
+export class SwsMongo {
+  private MONGO_URL: string;
+
+  private MONGO_USERNAME: string;
+
+  private MONGO_PASSWORD: string;
+
+  private SWAGGER_STATS_MONGO_DB: string;
+
+  private sessionsDb: ICollection<Session>;
+
+  private swaggerStatsDb: ICollection<any>;
+
   constructor(options) {
     const {
       MONGO_URL,
@@ -19,17 +37,17 @@ class SwsMongo {
     this.SWAGGER_STATS_MONGO_DB = SWAGGER_STATS_MONGO_DB;
   }
 
-  async init() {
+  public async init(): Promise<void> {
     const uri = this.MONGO_USERNAME
       ? `mongodb://${this.MONGO_USERNAME}:${this.MONGO_PASSWORD}@${this.MONGO_URL}/${this.SWAGGER_STATS_MONGO_DB}`
       : `mongodb://${this.MONGO_URL}/${this.SWAGGER_STATS_MONGO_DB}`;
 
     const db = monk(uri);
-    this.sessionsDb = db.get("sessions");
-    this.swaggerStatsDb = db.get("swagger-stats");
+    this.sessionsDb = db.get<Session>("sessions");
+    this.swaggerStatsDb = db.get<any>("swagger-stats");
   }
 
-  async insertSession(session) {
+  public async insertSession(session: Session): Promise<InsertResult<Session>> {
     try {
       const data = await this.sessionsDb.insert(session);
       return data;
@@ -38,9 +56,12 @@ class SwsMongo {
     }
   }
 
-  async patchBySidSession(sessionSid, ms) {
+  public async patchBySidSession(
+    sessionSid: string,
+    ms: number,
+  ): Promise<FindOneResult<Session>> {
     try {
-      const data = await this.sessionsDb.update(
+      const data = await this.sessionsDb.findOneAndUpdate(
         { sid: sessionSid },
         { $set: { tsSec: ms } },
       );
@@ -50,19 +71,23 @@ class SwsMongo {
     }
   }
 
-  async findBySidSession(sessionSid) {
+  public async findBySidSession(
+    sessionId: string,
+  ): Promise<FindOneResult<Session>> {
     try {
-      const data = await this.sessionsDb.findOne({ sid: sessionSid });
+      const data = await this.sessionsDb.findOne({ sid: sessionId });
       return data;
     } catch (err) {
       throw new Error(err);
     }
   }
 
-  async archiveByIdSessions(sid) {
+  public async archiveByIdSessions(
+    sessionId: string,
+  ): Promise<FindOneResult<Session>> {
     try {
-      const data = await this.sessionsDb.update(
-        { sid },
+      const data = await this.sessionsDb.findOneAndUpdate(
+        { sid: sessionId },
         { $set: { archived: true } },
       );
       return data;
@@ -71,7 +96,7 @@ class SwsMongo {
     }
   }
 
-  async getAllSessions() {
+  async getAllSessions(): Promise<FindResult<Session>> {
     try {
       const data = await this.sessionsDb.find({ archived: false });
       return data;
@@ -80,5 +105,3 @@ class SwsMongo {
     }
   }
 }
-
-module.exports = SwsMongo;

@@ -3,93 +3,102 @@
  * Created by sv2 on 2/18/17.
  * API Statistics
  */
+import Debug from "debug";
+import { pathToRegexp } from "path-to-regexp";
 
-const { pathToRegexp } = require("path-to-regexp");
-const debug = require("debug")("sws:apistats");
-const swsSettings = require("./swsSettings.js");
+import {
+  ApiDetail,
+  ApiDetails,
+  ApiDetailsMethod,
+} from "./interfaces/api-details.interface";
+import { APIOperationStats } from "./interfaces/api-operation-stats.interface";
+import {
+  ApiDefs,
+  ApiStats,
+  ApiStatsMethod,
+} from "./interfaces/api-stats.interface";
+import { HTTPMethod } from "./interfaces/http-method.interface";
+import SwsMongo from "./swsMongo";
+import { SwsReqResStats } from "./swsReqResStats";
+import swsSettings from "./swsSettings";
+import { SwsUtil } from "./swsUtil";
+
 const swsMetrics = require("./swsMetrics.js");
-const swsUtil = require("./swsUtil.js");
-const SwsReqResStats = require("./swsReqResStats.js");
 const SwsBucketStats = require("./swsBucketStats.js");
 
 // API Statistics
 // Stores Definition of API based on Swagger Spec
 // Stores API Statistics, for both Swagger spec-based API, as well as for detected Express APIs (route.path)
 // Stores Detailed Stats for each API request
-class SwsAPIStats {
-  constructor() {
-    // Options
-    this.options = null;
+export class SwsAPIStats {
+  private debug = Debug("sws:apistats");
 
-    // API Base path per swagger spec
-    this.basePath = "/";
+  private options = null;
 
-    // Array of possible API path matches, populated based on Swagger spec
-    // Contains regex to match URI to Swagger path
-    this.apiMatchIndex = {};
+  private basePath = "/";
 
-    // API definition - entry per API request from swagger spec
-    // Stores attributes of known Swagger APIs - description, summary, tags, parameters
-    this.apidefs = {};
+  private apiMatchIndex = {};
 
-    // API statistics - entry per API request from swagger
-    // Paths not covered by swagger will be added on demand as used
-    this.apistats = {};
+  private apiDefs: ApiDefs = {};
 
-    // Detailed API stats
-    // TODO Consider: individual timelines (?), parameters (query/path?)
-    this.apidetails = {};
+  private apiStats: ApiStats = {};
 
-    // Buckets for histograms, with default bucket values
-    this.durationBuckets = [
-      5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000,
-    ];
-    this.requestSizeBuckets = [
-      5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000,
-    ];
-    this.responseSizeBuckets = [
-      5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000,
-    ];
+  private apiDetails: ApiDetails = {};
 
-    // Prometheus metrics in prom-client
-    this.promClientMetrics = {};
+  private durationBuckets = [
+    5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000,
+  ];
+
+  private requestSizeBuckets = [
+    5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000,
+  ];
+
+  private responseSizeBuckets = [
+    5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000,
+  ];
+
+  private promClientMetrics = {};
+
+  constructor(private readonly swsMongo: SwsMongo) {}
+
+  public getAPIDefs(): ApiDefs {
+    return this.apiDefs;
   }
 
-  getAPIDefs() {
-    return this.apidefs;
+  public getAPIStats(): ApiStats {
+    return this.apiStats;
   }
 
-  getAPIStats() {
-    return this.apistats;
-  }
-
-  getAPIOperationStats(path, method) {
-    if (typeof path === "undefined" || !path || path === "") return {};
-    if (typeof method === "undefined" || !method || method === "") return {};
+  public getAPIOperationStats(
+    path: string,
+    method: HTTPMethod,
+  ): APIOperationStats {
+    if (typeof path === "undefined" || !path) return {};
+    if (typeof method === "undefined" || !method) return {};
 
     const res = {};
     res[path] = {};
     res[path][method] = {};
 
     // api op defs
-    if (path in this.apidefs && method in this.apidefs[path]) {
-      res[path][method].defs = this.apidefs[path][method];
+    if (path in this.apiDefs && method in this.apiDefs[path]) {
+      res[path][method].defs = this.apiDefs[path][method];
     }
 
     // api op stats
-    if (path in this.apistats && method in this.apistats[path]) {
-      res[path][method].stats = this.apistats[path][method];
+    if (path in this.apiStats && method in this.apiStats[path]) {
+      res[path][method].stats = this.apiStats[path][method];
     }
 
     // api op details
-    if (path in this.apidetails && method in this.apidetails[path]) {
-      res[path][method].details = this.apidetails[path][method];
+    if (path in this.apiDetails && method in this.apiDetails[path]) {
+      res[path][method].details = this.apiDetails[path][method];
     }
 
     return res;
   }
 
-  initBasePath(swaggerSpec, swsOptions) {
+  private initBasePath(swaggerSpec, swsOptions): void {
     if ("basePath" in swsOptions && swsOptions.basePath !== "") {
       this.basePath = swsOptions.basePath;
     } else if (swaggerSpec.openapi && swaggerSpec.openapi.startsWith("3")) {
@@ -106,7 +115,7 @@ class SwsAPIStats {
   }
 
   // Get full swagger Path
-  getFullPath(path) {
+  private getFullPath(path: string): string {
     let fullPath = this.basePath;
     if (path.charAt(0) === "/") {
       fullPath += path.substring(1);
@@ -116,7 +125,7 @@ class SwsAPIStats {
     return fullPath;
   }
 
-  initialize(swsOptions) {
+  public initialize(swsOptions): void {
     // TODO remove
     if (!swsOptions) return;
     this.options = swsOptions;
@@ -158,7 +167,7 @@ class SwsAPIStats {
 
       // by default, regex is null
       const keys = [];
-      let re = null;
+      let re: RegExp | undefined;
 
       // Convert to express path
       let fullExpressPath = fullPath;
@@ -192,9 +201,9 @@ class SwsAPIStats {
         const op = operations[i];
         if (op in pathDef) {
           const opDef = pathDef[op];
-          const opMethod = op.toUpperCase();
+          const opMethod = op.toUpperCase() as HTTPMethod;
 
-          const apiOpDef = {}; // API Operation definition
+          const apiOpDef: ApiDefs = {}; // API Operation definition
           apiOpDef.swagger = true; // by definition
           apiOpDef.deprecated =
             "deprecated" in opDef ? opDef.deprecated : false;
@@ -207,8 +216,8 @@ class SwsAPIStats {
           this.apiMatchIndex[fullPath].methods[opMethod] = apiOpDef;
 
           // Store in API Operation definitions. Stored separately so only definition can be retrieved
-          if (!(fullPath in this.apidefs)) this.apidefs[fullPath] = {};
-          this.apidefs[fullPath][opMethod] = apiOpDef;
+          if (!(fullPath in this.apiDefs)) this.apiDefs[fullPath] = {};
+          this.apiDefs[fullPath][opMethod] = apiOpDef;
 
           // Create Stats for this API Operation; stats stored separately so only stats can be retrieved
           this.getAPIOpStats(fullPath, opMethod);
@@ -217,15 +226,9 @@ class SwsAPIStats {
           this.getApiOpDetails(fullPath, opMethod);
 
           // Process parameters for this op
-          this.processParameters(
-            swaggerSpec,
-            pathDef,
-            opDef,
-            fullPath,
-            opMethod,
-          );
+          this.processParameters(pathDef, opDef, fullPath, opMethod);
 
-          debug(
+          this.debug(
             "SWS:Initialize API:added %s %s (%s)",
             op,
             fullPath,
@@ -238,8 +241,13 @@ class SwsAPIStats {
 
   // Process parameterss for given operation
   // Take into account parameters defined as common for path (from pathDef)
-  processParameters(swaggerSpec, pathDef, opDef, fullPath, opMethod) {
-    const apidetailsEntry = this.getApiOpDetails(fullPath, opMethod);
+  private processParameters(
+    pathDef,
+    opDef,
+    path: string,
+    method: HTTPMethod,
+  ): void {
+    const apidetailsEntry = this.getApiOpDetails(path, method);
 
     // Params from path
     if ("parameters" in pathDef && pathDef.parameters instanceof Array) {
@@ -260,7 +268,7 @@ class SwsAPIStats {
     }
   }
 
-  processSingleParameter(apidetailsEntry, param) {
+  private processSingleParameter(apidetailsEntry, param): void {
     // eslint-disable-next-line no-param-reassign
     if (!("parameters" in apidetailsEntry)) apidetailsEntry.parameters = {};
     const params = apidetailsEntry.parameters;
@@ -273,7 +281,7 @@ class SwsAPIStats {
 
     // Process all supported parameter properties
     // eslint-disable-next-line no-restricted-syntax
-    for (const supportedProp of Object.keys(swsUtil.swsParameterProperties)) {
+    for (const supportedProp of Object.keys(SwsUtil.swsParameterProperties)) {
       if (supportedProp in param) {
         paramEntry[supportedProp] = param[supportedProp];
       }
@@ -293,51 +301,59 @@ class SwsAPIStats {
   }
 
   // Get or create API Operation Details
-  getApiOpDetails(path, method) {
-    if (!(path in this.apidetails)) this.apidetails[path] = {};
-    if (!(method in this.apidetails[path]))
-      this.apidetails[path][method] = {
-        duration: new SwsBucketStats(this.durationBuckets), // Request duration histogram
-        req_size: new SwsBucketStats(this.requestSizeBuckets), // Request size histogram
-        res_size: new SwsBucketStats(this.responseSizeBuckets), // Response size histogram
-        code: { 200: { count: 0 } }, // Counts by response code
+  private getApiOpDetails(path: string, method: HTTPMethod): ApiDetail {
+    if (!(path in this.apiDetails)) {
+      this.apiDetails[path] = {} as ApiDetailsMethod;
+    }
+    if (!(method in this.apiDetails[path]))
+      this.apiDetails[path][method] = {
+        duration: new SwsBucketStats(this.durationBuckets),
+        req_size: new SwsBucketStats(this.requestSizeBuckets),
+        res_size: new SwsBucketStats(this.responseSizeBuckets),
+        code: { 200: { count: 0 } },
       };
-    return this.apidetails[path][method];
+
+    return this.apiDetails[path][method];
   }
 
   // Get or create API Operation Stats
-  getAPIOpStats(path, method) {
-    if (!(path in this.apistats)) this.apistats[path] = {};
-    if (!(method in this.apistats[path]))
-      this.apistats[path][method] = new SwsReqResStats(
+  private getAPIOpStats(path: string, method: HTTPMethod): SwsReqResStats {
+    if (!(path in this.apiStats)) {
+      this.apiStats[path] = {} as ApiStatsMethod;
+    }
+    if (!(method in this.apiStats[path]))
+      this.apiStats[path][method] = new SwsReqResStats(
         this.options.apdexThreshold,
+        this.swsMongo,
       );
-    return this.apistats[path][method];
+
+    return this.apiStats[path][method];
   }
 
   // Update and stats per tick
-  tick(ts, totalElapsedSec) {
+  public tick(totalElapsedSec: number): void {
     // Update Rates in apistats
     // eslint-disable-next-line no-restricted-syntax
-    for (const path of Object.keys(this.apistats)) {
+    for (const path of Object.keys(this.apiStats)) {
       // eslint-disable-next-line no-restricted-syntax
-      for (const method of Object.keys(this.apistats[path])) {
-        this.apistats[path][method].updateRates(totalElapsedSec);
+      for (const method of Object.keys(this.apiStats[path])) {
+        this.apiStats[path][method].updateRates(totalElapsedSec);
       }
     }
   }
 
   // Extract path parameter values based on successful path match results
-  extractPathParams(matchResult, keys) {
+  private extractPathParams(matchResult, keys) {
     const pathParams = {};
     for (let i = 0; i < keys.length; i += 1) {
       if ("name" in keys[i]) {
         const vidx = i + 1; // first element in match result is URI
         if (vidx < matchResult.length) {
-          pathParams[keys[i].name] = swsUtil.swsStringValue(matchResult[vidx]);
+          pathParams[keys[i].name] = SwsUtil.swsStringValue(matchResult[vidx]);
         }
       }
     }
+
     return pathParams;
   }
 
@@ -366,7 +382,7 @@ class SwsAPIStats {
     if (url in this.apiMatchIndex) {
       matchEntry = this.apiMatchIndex[url];
       apiPath = url;
-      debug("SWS:MATCH: %s exact match", url);
+      this.debug("SWS:MATCH: %s exact match", url);
     } else {
       // if not, search by regex matching
       // eslint-disable-next-line no-restricted-syntax
@@ -380,7 +396,7 @@ class SwsAPIStats {
               matchResult,
               this.apiMatchIndex[swPath].keys,
             );
-            debug("SWS:MATCH: %s matched to %s", url, swPath);
+            this.debug("SWS:MATCH: %s matched to %s", url, swPath);
             break; // Done
           }
         }
@@ -463,7 +479,7 @@ class SwsAPIStats {
         switch (param.in) {
           case "path":
             if ("path_params" in req.sws && pname in req.sws.path_params) {
-              paramValues[pname] = swsUtil.swsStringValue(
+              paramValues[pname] = SwsUtil.swsStringValue(
                 req.sws.path_params[pname],
               );
             }
@@ -471,7 +487,7 @@ class SwsAPIStats {
 
           case "query":
             if ("query" in req.sws && pname in req.sws.query) {
-              paramValues[pname] = swsUtil.swsStringValue(req.sws.query[pname]);
+              paramValues[pname] = SwsUtil.swsStringValue(req.sws.query[pname]);
             }
             break;
 
@@ -484,11 +500,11 @@ class SwsAPIStats {
   }
 
   // Count request
-  countRequest(req, res) {
+  async countRequest(req, res) {
     // Count request if it was matched to API Operation
     if ("match" in req.sws && req.sws.match) {
       const apiOpStats = this.getAPIOpStats(req.sws.api_path, req.method);
-      apiOpStats.countRequest(req.sws.req_clength);
+      await apiOpStats.countRequest(req.sws.req_clength);
       this.countParametersStats(req.sws.api_path, req.method, req, res);
     }
   }
@@ -496,7 +512,7 @@ class SwsAPIStats {
   // Count finished response
   countResponse(res) {
     const req = res._swsReq;
-    const codeclass = swsUtil.getStatusCodeClass(res.statusCode);
+    const codeclass = SwsUtil.getStatusCodeClass(res.statusCode);
 
     // Only intersted in updating stats here
     const apiOpStats = this.getAPIOpStats(req.sws.api_path, req.method);

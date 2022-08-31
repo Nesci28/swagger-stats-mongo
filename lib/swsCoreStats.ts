@@ -3,44 +3,52 @@
  * Created by sv2 on 2/18/17.
  * API usage statistics data
  */
+import { Request, Response } from "express";
+import promClient from "prom-client";
 
-const swsSettings = require("./swsSettings.js");
+import { CoreMethods } from "./interfaces/core-methods.interface";
+import { SwsMongo } from "./swsMongo";
+import { SwsReqResStats } from "./swsReqResStats";
+import swsSettings from "./swsSettings";
+import { SwsUtil } from "./swsUtil";
+
 const swsMetrics = require("./swsMetrics.js");
-const swsUtil = require("./swsUtil.js");
-const SwsReqResStats = require("./swsReqResStats.js");
 
 /* swagger=stats Prometheus metrics */
-class SwsCoreStats {
-  constructor() {
-    // Statistics for all requests
-    this.all = null;
+export class SwsCoreStats {
+  // Statistics for all requests
+  private all = new SwsReqResStats(swsSettings.apdexThreshold, this.swsMongo);
 
-    // Statistics for requests by method
-    // Initialized with most frequent ones, other methods will be added on demand if actually used
-    this.method = null;
+  // Statistics for requests by method
+  // Initialized with most frequent ones, other methods will be added on demand if actually used
+  private method: CoreMethods = {};
 
-    // Additional prefix for prometheus metrics. Used if this coreStats instance
-    // plays special role, i.e. count stats for egress
-    this.metricsRolePrefix = "";
+  // Additional prefix for prometheus metrics. Used if private coreStats instance
+  // plays special role, i.e. count stats for egress
+  private metricsRolePrefix = "";
 
-    // Prometheus metrics
-    this.promClientMetrics = {};
-  }
+  // Prometheus metrics
+  private promClientMetrics: {
+    [key: string]: promClient.Counter<string> | promClient.Gauge<string>;
+    // | promClient.Histogram<string>;
+  } = {};
+
+  constructor(private readonly swsMongo: SwsMongo) {}
 
   // Initialize
-  initialize(metricsRolePrefix) {
+  public initialize(metricsRolePrefix: string): void {
     this.metricsRolePrefix = metricsRolePrefix || "";
 
     // Statistics for all requests
-    this.all = new SwsReqResStats(swsSettings.apdexThreshold);
+    this.all = new SwsReqResStats(swsSettings.apdexThreshold, this.swsMongo);
 
     // Statistics for requests by method
     // Initialized with most frequent ones, other methods will be added on demand if actually used
     this.method = {
-      GET: new SwsReqResStats(swsSettings.apdexThreshold),
-      POST: new SwsReqResStats(swsSettings.apdexThreshold),
-      PUT: new SwsReqResStats(swsSettings.apdexThreshold),
-      DELETE: new SwsReqResStats(swsSettings.apdexThreshold),
+      GET: new SwsReqResStats(swsSettings.apdexThreshold, this.swsMongo),
+      POST: new SwsReqResStats(swsSettings.apdexThreshold, this.swsMongo),
+      PUT: new SwsReqResStats(swsSettings.apdexThreshold, this.swsMongo),
+      DELETE: new SwsReqResStats(swsSettings.apdexThreshold, this.swsMongo),
     };
 
     // metrics
@@ -53,16 +61,16 @@ class SwsCoreStats {
     );
   }
 
-  getStats() {
+  public getStats(): SwsReqResStats {
     return this.all;
   }
 
-  getMethodStats() {
+  public getMethodStats(): CoreMethods {
     return this.method;
   }
 
   // Update timeline and stats per tick
-  tick(ts, totalElapsedSec) {
+  public tick(totalElapsedSec: number): void {
     // Rates
     this.all.updateRates(totalElapsedSec);
     // eslint-disable-next-line no-restricted-syntax
@@ -72,14 +80,17 @@ class SwsCoreStats {
   }
 
   // Count request
-  countRequest(req) {
+  public countRequest(req: Request & { sws: any }): void {
     // Count in all
     this.all.countRequest(req.sws.req_clength);
 
     // Count by method
     const { method } = req;
     if (!(method in this.method)) {
-      this.method[method] = new SwsReqResStats();
+      this.method[method] = new SwsReqResStats(
+        swsSettings.apdexThreshold,
+        this.swsMongo,
+      );
     }
     this.method[method].countRequest(req.sws.req_clength);
 
@@ -87,11 +98,14 @@ class SwsCoreStats {
     this.promClientMetrics.api_all_request_total.inc();
     this.promClientMetrics.api_all_request_in_processing_total.inc();
     req.sws.inflightTimer = setTimeout(() => {
-      this.promClientMetrics.api_all_request_in_processing_total.dec();
+      (
+        this.promClientMetrics
+          .api_all_request_in_processing_total as promClient.Gauge<string>
+      ).dec();
     }, 250000);
   }
 
-  countResponse(res) {
+  public countResponse(res: Response & { _swsReq: any }): void {
     const req = res._swsReq;
 
     // Defaults
@@ -100,22 +114,8 @@ class SwsCoreStats {
     // let timelineid = req.sws.timelineid || 0;
     // let path = req.sws.api_path || req.sws.originalUrl || req.originalUrl;
 
-    /*
-        if("sws" in req) {
-            startts = req.sws.startts;
-            timelineid = req.sws.timelineid;
-            var endts = Date.now();
-            req['sws'].endts = endts;
-            duration = endts - startts;
-            req['sws'].duration = duration;
-            req['sws'].res_clength = resContentLength;
-            path = req['sws'].api_path;
-            clearTimeout(req.sws.inflightTimer);
-        }
-        */
-
     // Determine status code type
-    const codeclass = swsUtil.getStatusCodeClass(res.statusCode);
+    const codeclass = SwsUtil.getStatusCodeClass(res.statusCode);
 
     // update counts for all requests
     this.all.countResponse(
@@ -156,8 +156,9 @@ class SwsCoreStats {
       default:
         throw new Error("default case should not be happening");
     }
-    this.promClientMetrics.api_all_request_in_processing_total.dec();
+    (
+      this.promClientMetrics
+        .api_all_request_in_processing_total as promClient.Gauge<string>
+    ).dec();
   }
 }
-
-module.exports = SwsCoreStats;

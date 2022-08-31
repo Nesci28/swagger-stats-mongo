@@ -2,3 +2,5 @@
 .npmrc
 mongo/*
 !mongo/.gitkeep
+elasticsearch
+!elasticsearch/.gitkeep

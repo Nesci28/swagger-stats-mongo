@@ -58,7 +58,7 @@ parser.validate(swaggerSpec, async (err) => {
         timelineBucketDuration: tlBucket,
         uriPath: "/swagger-stats",
         swaggerSpec,
-        elasticsearch: "http://127.0.0.1:9200",
+        elasticsearch: "http://swagger-stats-elasticsearch:9200",
         MONGO_URL: "127.0.0.1:27027",
         SWAGGER_STATS_MONGO_DB: "swagger-stats",
       }),
