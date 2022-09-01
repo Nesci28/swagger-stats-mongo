@@ -19,7 +19,7 @@ const expressBodyParser = require("body-parser");
 
 const SwaggerParser = require("swagger-parser");
 
-const swStats = require("../../lib/index.js"); // require('swagger-stats');
+const swStats = require("../../dist/index.js"); // require('swagger-stats');
 
 // eslint-disable-next-line no-multi-assign
 const app = (module.exports = express());

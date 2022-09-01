@@ -22,10 +22,11 @@ export interface ApiDetail {
 }
 
 export interface Parameter {
-  hits: number;
-  in: string;
-  misses: number;
+  hits?: number;
+  in?: string;
+  misses?: number;
   required?: boolean;
+  name?: string;
 }
 
 export type ApiDetailsStatusCode = {

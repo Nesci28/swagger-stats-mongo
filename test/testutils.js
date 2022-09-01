@@ -4,9 +4,9 @@
  * SWS Test utilities
  */
 
-const swsUtil = require("../lib/swsUtil");
+const swsUtil = require("../dist/swsUtil.js");
 const debug = require("debug")("swstest:utils");
-const swsReqResStats = require("../lib/swsReqResStats");
+const swsReqResStats = require("../dist/swsReqResStats.js");
 
 module.exports.getApiBasePath = function (swaggerSpec) {
   let basePath = swaggerSpec.basePath ? swaggerSpec.basePath : "/";

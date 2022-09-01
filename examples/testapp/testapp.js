@@ -10,7 +10,8 @@ const expressBodyParser = require("body-parser");
 
 const SwaggerParser = require("swagger-parser");
 
-const swStats = require("../../lib/index.js"); // require('swagger-stats');
+const swStats = require("../../dist/index.js");
+// require('swagger-stats');
 
 // Mockup API implementation
 const API = require("./api.js");

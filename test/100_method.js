@@ -1,29 +1,26 @@
-const util = require("util");
 const chai = require("chai");
 
 chai.should();
-const { expect } = chai;
 const supertest = require("supertest");
-const cuid = require("cuid");
 
 const Q = require("q");
 const http = require("http");
 
 // We will use it to store expected values
 const debug = require("debug")("swstest:baseline");
-const swsReqResStats = require("../lib/swsReqResStats");
-const swsUtil = require("../lib/swsUtil");
+const SwsReqResStats = require("../dist/swsReqResStats.js");
+const SwsUtil = require("../dist/swsUtil.js");
 
-const swsTestFixture = require("./testfixture");
-const swsTestUtils = require("./testutils");
+const swsTestFixture = require("./testfixture.js");
+const swsTestUtils = require("./testutils.js");
 
 // duration of method test - number of requests
-let method_test_duration = 50;
+let methodTestDuration = 50;
 if (process.env.SWS_METHOD_TEST_DURATION) {
-  method_test_duration = parseInt(process.env.SWS_METHOD_TEST_DURATION);
+  methodTestDuration = parseInt(process.env.SWS_METHOD_TEST_DURATION, 10);
 }
 
-const expected_method_values = {};
+const expectedMethodValues = {};
 
 function sendTestRequestsOnce(iteration, deferred) {
   if (iteration <= 0) {
@@ -38,14 +35,14 @@ function sendTestRequestsOnce(iteration, deferred) {
   let reqcntr = 0;
 
   methods.forEach((method) => {
-    if (!(method in expected_method_values)) {
-      expected_method_values[method] = new swsReqResStats();
+    if (!(method in expectedMethodValues)) {
+      expectedMethodValues[method] = new SwsReqResStats();
     }
-    const methodCurrent = expected_method_values[method];
+    const methodCurrent = expectedMethodValues[method];
 
     const numReq = swsTestUtils.getRandomArbitrary(0, 5);
-    for (var i = 0; i < numReq; i++) {
-      reqcntr++;
+    for (let i = 0; i < numReq; i += 1) {
+      reqcntr += 1;
 
       const randomcode = swsTestUtils.getRandomHttpStatusCode();
       const hdr = {
@@ -76,24 +73,24 @@ function sendTestRequestsOnce(iteration, deferred) {
       if (method === "post" || method === "put") {
         const reqPayloadSize = swsTestUtils.getRandomArbitrary(10, 200);
         let str = "";
-        for (var i = 0; i < reqPayloadSize; i++) str += "r";
+        for (let j = 0; j < reqPayloadSize; j += 1) str += "r";
         body = JSON.stringify([str]);
         options.headers["Content-Type"] = "application/json";
         options.headers["Content-Length"] = Buffer.byteLength(body);
       }
 
       // Store in expected values
-      methodCurrent.requests++;
-      methodCurrent[swsUtil.getStatusCodeClass(randomcode)]++;
-      if (swsUtil.isError(randomcode)) methodCurrent.errors++;
-      const req_clen = body !== null ? Buffer.byteLength(body) : 0;
-      methodCurrent.total_req_clength += req_clen;
-      const res_clen = hdr.payloadsize;
-      methodCurrent.total_res_clength += res_clen;
-      if (req_clen > methodCurrent.max_req_clength)
-        methodCurrent.max_req_clength = req_clen;
-      if (res_clen > methodCurrent.max_res_clength)
-        methodCurrent.max_res_clength = res_clen;
+      methodCurrent.request += 1;
+      methodCurrent[SwsUtil.getStatusCodeClass(randomcode)] += 1;
+      if (SwsUtil.isError(randomcode)) methodCurrent.errors += 1;
+      const reqClen = body !== null ? Buffer.byteLength(body) : 0;
+      methodCurrent.total_req_clength += reqClen;
+      const resClen = hdr.payloadsize;
+      methodCurrent.total_res_clength += resClen;
+      if (reqClen > methodCurrent.max_req_clength)
+        methodCurrent.max_req_clength = reqClen;
+      if (resClen > methodCurrent.max_res_clength)
+        methodCurrent.max_res_clength = resClen;
       methodCurrent.avg_req_clength = Math.floor(
         methodCurrent.total_req_clength / methodCurrent.requests,
       );
@@ -101,8 +98,9 @@ function sendTestRequestsOnce(iteration, deferred) {
         methodCurrent.total_res_clength / methodCurrent.requests,
       );
 
-      const req = http.request(options, (res) => {
-        reqcntr--;
+      // eslint-disable-next-line no-loop-func
+      const req = http.request(options, () => {
+        reqcntr -= 1;
         if (reqcntr <= 0) {
           sendTestRequestsOnce(iteration - 1, deferred);
         }
@@ -114,28 +112,22 @@ function sendTestRequestsOnce(iteration, deferred) {
 
 function generateTestRequests() {
   const deferred = Q.defer();
-  sendTestRequestsOnce(method_test_duration, deferred);
+  sendTestRequestsOnce(methodTestDuration, deferred);
   return deferred.promise;
 }
 
 setImmediate(() => {
-  describe("Method statistics test", function () {
+  describe("Method statistics test", () => {
     this.timeout(60000);
 
     let appTimelineTest = null;
     let apiTimelineTest = null;
 
-    const timelineStatsInitial = null;
-    const timelineStatsCurrent = null;
-
     let methodStatsInitial = null;
     let methodStatsCurrent = null;
 
-    const client_error_id = cuid();
-    const server_error_id = cuid();
-
     // 1 second
-    const timeline_bucket_duration = 1000;
+    const timelineBucketDuration = 1000;
 
     describe("Initialize", () => {
       it("should initialize example app", (done) => {
@@ -151,8 +143,9 @@ setImmediate(() => {
                   .auth("swagger-stats", "swagger-stats");
                 done();
               } else {
-                process.env.SWS_TEST_TIMEBUCKET = timeline_bucket_duration;
-                appTimelineTest = require("../examples/testapp/testapp");
+                process.env.SWS_TEST_TIMEBUCKET = timelineBucketDuration;
+                // eslint-disable-next-line global-require
+                appTimelineTest = require("../examples/testapp/testapp.js");
                 apiTimelineTest = supertest(
                   `http://localhost:${appTimelineTest.app.get("port")}`,
                 );
@@ -172,6 +165,7 @@ setImmediate(() => {
           .end((err, res) => {
             if (err) return done(err);
 
+            // eslint-disable-next-line no-unused-expressions
             res.body.should.not.be.empty;
             res.body.should.have.property("method");
             methodStatsInitial = res.body.method;
@@ -181,7 +175,7 @@ setImmediate(() => {
     });
 
     describe("Send Test Requests", () => {
-      it(`should send random number of test requests ${method_test_duration} times`, (done) => {
+      it(`should send random number of test requests ${methodTestDuration} times`, (done) => {
         generateTestRequests().then(() => {
           debug("generateRandomRequests - finished!");
           done();
@@ -199,6 +193,7 @@ setImmediate(() => {
           .end((err, res) => {
             if (err) return done(err);
 
+            // eslint-disable-next-line no-unused-expressions
             res.body.should.not.be.empty;
             res.body.should.have.property("method");
             methodStatsCurrent = res.body.method;
@@ -207,12 +202,13 @@ setImmediate(() => {
       });
 
       it("should have correct values of method statistics", (done) => {
-        for (const method in expected_method_values) {
+        // eslint-disable-next-line no-restricted-syntax, guard-for-in
+        for (const method in expectedMethodValues) {
           // debug('Comparing[%s]: Expected %s Actual:%s', method, JSON.stringify(expected_method_values[method]),JSON.stringify(methodStatsCurrent[method]) );
           console.log(
             "Comparing[%s]: Expected %s Actual:%s",
             method,
-            JSON.stringify(expected_method_values[method]),
+            JSON.stringify(expectedMethodValues[method]),
             JSON.stringify(methodStatsCurrent[method]),
           );
           methodStatsCurrent.should.have.property(method);
@@ -223,32 +219,32 @@ setImmediate(() => {
           console.log(
             "Comparing[%s]: Expected %s Adjusted :%s",
             method,
-            JSON.stringify(expected_method_values[method]),
+            JSON.stringify(expectedMethodValues[method]),
             JSON.stringify(adjustedStats),
           );
 
-          expected_method_values[method].requests.should.be.equal(
+          expectedMethodValues[method].requests.should.be.equal(
             adjustedStats.requests,
           );
-          expected_method_values[method].errors.should.be.equal(
+          expectedMethodValues[method].errors.should.be.equal(
             adjustedStats.errors,
           );
-          expected_method_values[method].success.should.be.equal(
+          expectedMethodValues[method].success.should.be.equal(
             adjustedStats.success,
           );
-          expected_method_values[method].redirect.should.be.equal(
+          expectedMethodValues[method].redirect.should.be.equal(
             adjustedStats.redirect,
           );
-          expected_method_values[method].client_error.should.be.equal(
+          expectedMethodValues[method].client_error.should.be.equal(
             adjustedStats.client_error,
           );
-          expected_method_values[method].server_error.should.be.equal(
+          expectedMethodValues[method].server_error.should.be.equal(
             adjustedStats.server_error,
           );
-          expected_method_values[method].total_req_clength.should.be.equal(
+          expectedMethodValues[method].total_req_clength.should.be.equal(
             adjustedStats.total_req_clength,
           );
-          expected_method_values[method].total_res_clength.should.be.equal(
+          expectedMethodValues[method].total_res_clength.should.be.equal(
             adjustedStats.total_res_clength,
           );
           methodStatsCurrent[method].avg_req_clength.should.be.equal(
@@ -270,5 +266,6 @@ setImmediate(() => {
     });
   });
 
+  // eslint-disable-next-line no-undef
   run();
 });

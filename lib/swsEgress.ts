@@ -11,7 +11,7 @@ import swsSettings from "./swsSettings";
 class SwsEgress {
   private debug = Debug("sws:egress");
 
-  private originalRequest: (
+  public originalRequest: (
     options: string | http.RequestOptions | URL,
     callback?: ((res: http.IncomingMessage) => void) | undefined,
   ) => http.ClientRequest;
@@ -42,11 +42,13 @@ class SwsEgress {
 }
 
 const swsEgress = new SwsEgress();
-export default swsEgress;
 
-export function wrapMethodRequest(...args): http.ClientRequest {
+function wrapMethodRequest(...args): http.ClientRequest {
+  const that: SwsEgress = this as SwsEgress;
   // eslint-disable-next-line prefer-spread
-  const req = (this as any).originalRequest.apply(this, args);
+  const req = that.originalRequest.apply(that, args);
   swsEgress.handleRequest(req);
   return req;
 }
+
+export { swsEgress, wrapMethodRequest };

@@ -163,4 +163,4 @@ class SwsMetrics {
 }
 
 const swsMetrics = new SwsMetrics();
-export default swsMetrics;
+export = swsMetrics;

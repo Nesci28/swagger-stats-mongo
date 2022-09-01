@@ -1,41 +1,34 @@
-const util = require("util");
 const chai = require("chai");
 
 chai.should();
-const { expect } = chai;
 const supertest = require("supertest");
-const cuid = require("cuid");
 
 const Q = require("q");
 const http = require("http");
 
 // We will use it to store expected values
 const debug = require("debug")("swstest:baseline");
-const swsReqResStats = require("../lib/swsReqResStats");
-const swsUtil = require("../lib/swsUtil");
+const SwsReqResStats = require("../dist/swsReqResStats.js");
+const SwsUtil = require("../dist/swsUtil.js");
 
-const swsTestFixture = require("./testfixture");
-const swsTestUtils = require("./testutils");
+const swsTestFixture = require("./testfixture.js");
+const swsTestUtils = require("./testutils.js");
 
 let appTimelineTest = null;
 let apiTimelineTest = null;
 
-let timelineStatsInitial = null;
 let timelineStatsCurrent = null;
 
-const client_error_id = cuid();
-const server_error_id = cuid();
-
 // 1 second
-const timeline_bucket_duration = 1000;
+const timelineBucketDuration = 1000;
 
 // duration of timeline test - number of iterations
-let timeline_test_duration = 3;
+let timelineTestDuration = 3;
 if (process.env.SWS_TIMELINE_TEST_DURATION) {
-  timeline_test_duration = parseInt(process.env.SWS_TIMELINE_TEST_DURATION);
+  timelineTestDuration = parseInt(process.env.SWS_TIMELINE_TEST_DURATION, 10);
 }
 
-const expected_timeline_values = {};
+const expectedTimelineValues = {};
 
 function sendTestRequestsOnce(iteration, deferred) {
   if (iteration <= 0) {
@@ -47,17 +40,17 @@ function sendTestRequestsOnce(iteration, deferred) {
 
   const ts = Date.now();
   debug("Iter(%d): starting at %s (%s) ", iteration, ts, ts % 1000);
-  const timelineid = Math.floor(ts / timeline_bucket_duration);
-  expected_timeline_values[timelineid] = new swsReqResStats();
-  const timelineCurrent = expected_timeline_values[timelineid];
+  const timelineid = Math.floor(ts / timelineBucketDuration);
+  expectedTimelineValues[timelineid] = new SwsReqResStats();
+  const timelineCurrent = expectedTimelineValues[timelineid];
 
   // Generate random number of requests each iteration
   let reqcntr = 0;
 
   methods.forEach((method) => {
     const numReq = swsTestUtils.getRandomArbitrary(0, 5);
-    for (var i = 0; i < numReq; i++) {
-      reqcntr++;
+    for (let i = 0; i < numReq; i += 1) {
+      reqcntr += 1;
 
       const randomcode = swsTestUtils.getRandomHttpStatusCode();
       const hdr = {
@@ -88,24 +81,24 @@ function sendTestRequestsOnce(iteration, deferred) {
       if (method === "post" || method === "put") {
         const reqPayloadSize = swsTestUtils.getRandomArbitrary(10, 200);
         let str = "";
-        for (var i = 0; i < reqPayloadSize; i++) str += "r";
+        for (let j = 0; j < reqPayloadSize; j += 1) str += "r";
         body = JSON.stringify([str]);
         options.headers["Content-Type"] = "application/json";
         options.headers["Content-Length"] = Buffer.byteLength(body);
       }
 
       // Store in expected values
-      timelineCurrent.requests++;
-      timelineCurrent[swsUtil.getStatusCodeClass(randomcode)]++;
-      if (swsUtil.isError(randomcode)) timelineCurrent.errors++;
-      const req_clen = body !== null ? Buffer.byteLength(body) : 0;
-      timelineCurrent.total_req_clength += req_clen;
-      const res_clen = hdr.payloadsize;
-      timelineCurrent.total_res_clength += res_clen;
-      if (req_clen > timelineCurrent.max_req_clength)
-        timelineCurrent.max_req_clength = req_clen;
-      if (res_clen > timelineCurrent.max_res_clength)
-        timelineCurrent.max_res_clength = res_clen;
+      timelineCurrent.requests += 1;
+      timelineCurrent[SwsUtil.getStatusCodeClass(randomcode)] += 1;
+      if (SwsUtil.isError(randomcode)) timelineCurrent.errors += 1;
+      const reqClen = body !== null ? Buffer.byteLength(body) : 0;
+      timelineCurrent.total_req_clength += reqClen;
+      const resClen = hdr.payloadsize;
+      timelineCurrent.total_res_clength += resClen;
+      if (reqClen > timelineCurrent.max_req_clength)
+        timelineCurrent.max_req_clength = reqClen;
+      if (resClen > timelineCurrent.max_res_clength)
+        timelineCurrent.max_res_clength = resClen;
       timelineCurrent.avg_req_clength = Math.floor(
         timelineCurrent.total_req_clength / timelineCurrent.requests,
       );
@@ -115,8 +108,9 @@ function sendTestRequestsOnce(iteration, deferred) {
       timelineCurrent.req_rate = timelineCurrent.requests;
       timelineCurrent.err_rate = timelineCurrent.errors;
 
-      const req = http.request(options, (res) => {
-        reqcntr--;
+      // eslint-disable-next-line no-loop-func
+      const req = http.request(options, () => {
+        reqcntr -= 1;
         if (reqcntr <= 0) {
           // repeat at the beginning of the next second
           const adjDelay = 1100 - (Date.now() % 1000);
@@ -132,17 +126,12 @@ function generateTestRequests() {
   const deferred = Q.defer();
   // Adjust start time so we'll be at the begging of each second
   const startdelay = 1100 - (Date.now() % 1000);
-  setTimeout(
-    sendTestRequestsOnce,
-    startdelay,
-    timeline_test_duration,
-    deferred,
-  );
+  setTimeout(sendTestRequestsOnce, startdelay, timelineTestDuration, deferred);
   return deferred.promise;
 }
 
 setImmediate(() => {
-  describe("Timeline statistics test", function () {
+  describe("Timeline statistics test", () => {
     this.timeout(120000);
 
     describe("Initialize", () => {
@@ -158,8 +147,9 @@ setImmediate(() => {
                   .auth("swagger-stats", "swagger-stats");
                 done();
               } else {
-                process.env.SWS_TEST_TIMEBUCKET = timeline_bucket_duration;
-                appTimelineTest = require("../examples/testapp/testapp");
+                process.env.SWS_TEST_TIMEBUCKET = timelineBucketDuration;
+                // eslint-disable-next-line global-require
+                appTimelineTest = require("../examples/testapp/testapp.js");
                 apiTimelineTest = supertest(
                   `http://localhost:${appTimelineTest.app.get("port")}`,
                 );
@@ -179,17 +169,17 @@ setImmediate(() => {
           .end((err, res) => {
             if (err) return done(err);
 
+            // eslint-disable-next-line no-unused-expressions
             res.body.should.not.be.empty;
             res.body.should.have.property("timeline");
             res.body.timeline.should.have.property("data");
-            timelineStatsInitial = res.body.timeline.data;
             done();
           });
       });
     });
 
     describe("Send Test Requests", () => {
-      it(`should send random number of test requests each second for ${timeline_test_duration} seconds`, (done) => {
+      it(`should send random number of test requests each second for ${timelineTestDuration} seconds`, (done) => {
         generateTestRequests().then(() => {
           debug("generateRandomRequests - finished!");
           done();
@@ -207,6 +197,7 @@ setImmediate(() => {
           .end((err, res) => {
             if (err) return done(err);
 
+            // eslint-disable-next-line no-unused-expressions
             res.body.should.not.be.empty;
             res.body.should.have.property("timeline");
             res.body.timeline.should.have.property("data");
@@ -216,49 +207,50 @@ setImmediate(() => {
       });
 
       it("should have correct values of timeline statistics", (done) => {
-        for (const tid in expected_timeline_values) {
+        // eslint-disable-next-line no-restricted-syntax, guard-for-in
+        for (const tid in expectedTimelineValues) {
           debug(
             "Comparing[%s]: Expected %s Actual:%s",
             tid,
-            JSON.stringify(expected_timeline_values[tid]),
+            JSON.stringify(expectedTimelineValues[tid]),
             JSON.stringify(timelineStatsCurrent[tid]),
           );
           timelineStatsCurrent.should.have.property(tid);
           timelineStatsCurrent[tid].should.have.property("stats");
-          expected_timeline_values[tid].requests.should.be.equal(
+          expectedTimelineValues[tid].requests.should.be.equal(
             timelineStatsCurrent[tid].stats.requests,
           );
-          expected_timeline_values[tid].errors.should.be.equal(
+          expectedTimelineValues[tid].errors.should.be.equal(
             timelineStatsCurrent[tid].stats.errors,
           );
-          expected_timeline_values[tid].success.should.be.equal(
+          expectedTimelineValues[tid].success.should.be.equal(
             timelineStatsCurrent[tid].stats.success,
           );
-          expected_timeline_values[tid].redirect.should.be.equal(
+          expectedTimelineValues[tid].redirect.should.be.equal(
             timelineStatsCurrent[tid].stats.redirect,
           );
-          expected_timeline_values[tid].client_error.should.be.equal(
+          expectedTimelineValues[tid].client_error.should.be.equal(
             timelineStatsCurrent[tid].stats.client_error,
           );
-          expected_timeline_values[tid].server_error.should.be.equal(
+          expectedTimelineValues[tid].server_error.should.be.equal(
             timelineStatsCurrent[tid].stats.server_error,
           );
-          expected_timeline_values[tid].total_req_clength.should.be.equal(
+          expectedTimelineValues[tid].total_req_clength.should.be.equal(
             timelineStatsCurrent[tid].stats.total_req_clength,
           );
-          expected_timeline_values[tid].total_res_clength.should.be.equal(
+          expectedTimelineValues[tid].total_res_clength.should.be.equal(
             timelineStatsCurrent[tid].stats.total_res_clength,
           );
-          expected_timeline_values[tid].avg_req_clength.should.be.equal(
+          expectedTimelineValues[tid].avg_req_clength.should.be.equal(
             timelineStatsCurrent[tid].stats.avg_req_clength,
           );
-          expected_timeline_values[tid].avg_res_clength.should.be.equal(
+          expectedTimelineValues[tid].avg_res_clength.should.be.equal(
             timelineStatsCurrent[tid].stats.avg_res_clength,
           );
-          expected_timeline_values[tid].req_rate.should.be.equal(
+          expectedTimelineValues[tid].req_rate.should.be.equal(
             timelineStatsCurrent[tid].stats.req_rate,
           );
-          expected_timeline_values[tid].err_rate.should.be.equal(
+          expectedTimelineValues[tid].err_rate.should.be.equal(
             timelineStatsCurrent[tid].stats.err_rate,
           );
         }
@@ -268,5 +260,6 @@ setImmediate(() => {
     });
   });
 
+  // eslint-disable-next-line no-undef
   run();
 });

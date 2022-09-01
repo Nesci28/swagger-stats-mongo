@@ -503,4 +503,4 @@ class SwsProcessor {
 }
 
 const swsProcessor = new SwsProcessor();
-export default swsProcessor;
+export = swsProcessor;

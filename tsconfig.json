@@ -13,10 +13,11 @@
         "incremental": true,
         "noImplicitAny": false,
         "noImplicitReturns": true,
-        "noImplicitThis": true,
+        "noImplicitThis": false,
         "noImplicitUseStrict": true,
         "skipLibCheck": true,
-        "strictNullChecks": false
+        "strictNullChecks": false,
+        "esModuleInterop": true
     },
     "exclude": ["node_modules", "dist"]
 }

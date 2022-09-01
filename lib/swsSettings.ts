@@ -2,7 +2,7 @@
 /* swagger-stats Settings */
 
 import { Request } from "express";
-import os from "os";
+import * as os from "os";
 
 /* swagger=stats settings */
 class SwsSettings {
@@ -160,4 +160,4 @@ class SwsSettings {
 }
 
 const swsSettings = new SwsSettings();
-export default swsSettings;
+export = swsSettings;

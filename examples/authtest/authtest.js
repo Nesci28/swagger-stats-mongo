@@ -10,7 +10,7 @@ const { MongoMemoryServer } = require("mongodb-memory-server");
 // Express and middlewares
 const express = require("express");
 const expressBodyParser = require("body-parser");
-const swStats = require("../../lib/index.js"); // require('swagger-stats');
+const swStats = require("../../dist/index.js"); // require('swagger-stats');
 
 const { collectDefaultMetrics } = promClient;
 // Probe every 1 second

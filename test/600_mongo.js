@@ -4,7 +4,7 @@ const { MongoMemoryServer } = require("mongodb-memory-server");
 chai.should();
 const { expect } = chai;
 
-const SwsMongo = require("../lib/swsMongo.js");
+const SwsMongo = require("../dist/swsMongo.js");
 
 setImmediate(() => {
   describe("SwsMongo test", () => {

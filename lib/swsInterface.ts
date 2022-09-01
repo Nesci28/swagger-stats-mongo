@@ -13,7 +13,7 @@ import url from "url";
 import { SwsRequest } from "./interfaces/request.interface";
 import { SwsResponse } from "./interfaces/response.interface";
 import { SwsAuth } from "./swsAuth";
-import swsEgress from "./swsEgress";
+import { swsEgress } from "./swsEgress";
 import { SwsMongo } from "./swsMongo";
 import swsProcessor from "./swsProcessor";
 import swsSettings from "./swsSettings";
@@ -172,7 +172,7 @@ async function expressMiddleware(
   return fn;
 }
 
-export default {
+export = {
   getMiddleware: expressMiddleware,
 
   // TODO Support specifying which stat fields to return
