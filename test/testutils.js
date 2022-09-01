@@ -4,9 +4,9 @@
  * SWS Test utilities
  */
 
-const swsUtil = require("../dist/swsUtil.js");
+const { SwsUtil } = require("../dist/swsUtil.js");
 const debug = require("debug")("swstest:utils");
-const swsReqResStats = require("../dist/swsReqResStats.js");
+const { SwsReqResStats } = require("../dist/swsReqResStats.js");
 
 module.exports.getApiBasePath = function (swaggerSpec) {
   let basePath = swaggerSpec.basePath ? swaggerSpec.basePath : "/";
@@ -62,7 +62,7 @@ function processSingleParameter(apiOpParams, param) {
   const paramEntry = apiOpParams[pname];
 
   // Process all supported parameter properties
-  for (const supportedProp in swsUtil.swsParameterProperties) {
+  for (const supportedProp in SwsUtil.swsParameterProperties) {
     if (supportedProp in param) {
       paramEntry[supportedProp] = param[supportedProp];
     }
@@ -288,7 +288,7 @@ module.exports.getHttpStatusMessage = function (code) {
 module.exports.getRRStatsDiff = function (first, second) {
   if (typeof first === "undefined") return second;
 
-  const res = new swsReqResStats();
+  const res = new SwsReqResStats();
   res.requests = second.requests - first.requests; // Total number of requests received
   res.responses = second.responses - first.responses; // Total number of responses sent
   res.errors = second.errors - first.errors; // Total number of error responses

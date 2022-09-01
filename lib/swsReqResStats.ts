@@ -15,6 +15,16 @@ export class SwsReqResStats {
 
   private errors = 0; // Total number of error responses
 
+  private info = 0; // Total number of informational responses
+
+  private success = 0; // Total number of success responses
+
+  private redirect = 0; // Total number of redirection responses
+
+  private client_error = 0; // Total number of client error responses
+
+  private server_error = 0; // Total number of server error responses
+
   private total_time = 0; // Sum of total processing time (from request received to response finished)
 
   private max_time = 0; // Maximum observed processed time
@@ -37,8 +47,9 @@ export class SwsReqResStats {
 
   private err_rate = 0; // Error Rate
 
-  private apdex_threshold =
-    typeof this.apdexThreshold !== "undefined" ? this.apdexThreshold : 50; // Apdex threshold
+  private apdex_threshold = Number.isNaN(this.apdexThreshold)
+    ? this.apdexThreshold
+    : 50; // Apdex threshold
 
   private apdex_satisfied = 0; // Total number of "satisfied" responses for Apdex: time <= apdex_threshold
 

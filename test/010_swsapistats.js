@@ -3,7 +3,7 @@ const chai = require("chai");
 chai.should();
 const { expect } = chai;
 
-const SwsAPIStats = require("../dist/swsAPIStats.js");
+const { SwsAPIStats } = require("../dist/swsAPIStats.js");
 
 setImmediate(() => {
   describe("swsAPIStats test", () => {

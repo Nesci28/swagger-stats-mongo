@@ -8,8 +8,8 @@ const http = require("http");
 
 // We will use it to store expected values
 const debug = require("debug")("swstest:baseline");
-const SwsReqResStats = require("../dist/swsReqResStats.js");
-const SwsUtil = require("../dist/swsUtil.js");
+const { SwsReqResStats } = require("../dist/swsReqResStats.js");
+const { SwsUtil } = require("../dist/swsUtil.js");
 
 const swsTestFixture = require("./testfixture.js");
 const swsTestUtils = require("./testutils.js");
@@ -80,7 +80,7 @@ function sendTestRequestsOnce(iteration, deferred) {
       }
 
       // Store in expected values
-      methodCurrent.request += 1;
+      methodCurrent.requests += 1;
       methodCurrent[SwsUtil.getStatusCodeClass(randomcode)] += 1;
       if (SwsUtil.isError(randomcode)) methodCurrent.errors += 1;
       const reqClen = body !== null ? Buffer.byteLength(body) : 0;
@@ -118,8 +118,6 @@ function generateTestRequests() {
 
 setImmediate(() => {
   describe("Method statistics test", () => {
-    this.timeout(60000);
-
     let appTimelineTest = null;
     let apiTimelineTest = null;
 
@@ -180,7 +178,7 @@ setImmediate(() => {
           debug("generateRandomRequests - finished!");
           done();
         });
-      });
+      }).timeout(10000);
     });
 
     // Get API Stats, and check that number of requests / responses is correctly calculated

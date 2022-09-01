@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/explicit-member-accessibility */
 /* swagger-stats Settings */
 
-import { Request } from "express";
 import * as os from "os";
 
 /* swagger=stats settings */
@@ -18,6 +17,9 @@ class SwsSettings {
   // IP Address. Will attempt to detect if not provided
   public ip = "";
 
+  // Swagger specification JSON document. Should be pre-validated and with resolved references. Optional.
+  public swaggerSpec = null;
+
   // Base path for API described in swagger spec.
   // Specify this when using openapi: "3.0.0" specifications
   // For example, setting basePath='/api' with petrstore spec would match requests /api/pet/{id}, etc ...
@@ -28,6 +30,9 @@ class SwsSettings {
   // /<uriPath>/ui, /<uriPath>/stats, /<uriPath>/metrics
   // overriding default /swagger-stats/ui
   public uriPath = "/swagger-stats";
+
+  // Duration of timeline bucket in milliseconds, 60000 by default
+  public timelineBucketDuration = 60000;
 
   // Buckets for duration histogram metrics, in Milliseconds
   // Optional. Default value:
@@ -78,7 +83,7 @@ class SwsSettings {
   // - req - request
   // must return true if user authenticated, false if not
   // eg: (req) => { if(req.user.isAdmin) {return true;} else {return false }}
-  public customAuth: (req: Request) => boolean;
+  public customAuth = null;
 
   // Callback to invoke to authenticate request to /swagger-stats/stats and /swagger-stats/metrics
   // If authentication is enabled (option authentication=true),
@@ -89,15 +94,30 @@ class SwsSettings {
   // - username - username
   // - password - password
   // callback must return true if user authenticated, false if not
-  public onAuthenticate: (
-    req: Request,
-    username: string,
-    password: string,
-  ) => boolean;
+  public onAuthenticate = null;
 
   // Max Age of the session, if authentication is enabled, in seconds
   // Default is 900 seconds
   public sessionMaxAge = 900;
+
+  // ElasticSearch URL. Enables storing of request response records in Elasticsearch.
+  // Default is empty (disabled).
+  public elasticsearch = null;
+
+  // Prefix for Elasticsearch index. Default is "api-"
+  public elasticsearchIndexPrefix = "api-";
+
+  // Username for Elasticsearch, if anonymous user is disbaled . Default is empty (disabled)
+  public elasticsearchUsername = null;
+
+  // Password for Elasticsearch, if anonymous user is disbaled . Default is empty (disabled)
+  public elasticsearchPassword = null;
+
+  // Elasticsearch key for SSL connection
+  public elasticsearchKey = null;
+
+  // Elasticsearch certificat for SSL connection
+  public elasticsearchCert = null;
 
   // Set to true to track only requests defined in swagger spec. Default false.
   public swaggerOnly = false;
@@ -108,9 +128,9 @@ class SwsSettings {
   // Enables Egress HTTP monitoring, true or false. Disabled by default.
   public enableEgress = false;
 
-  private pathUI = "/swagger-stats/ui";
+  public pathUI = "/swagger-stats/ui";
 
-  private pathDist = "/swagger-stats/dist";
+  public pathDist = "/swagger-stats/dist";
 
   public pathUX = "/swagger-stats/ux";
 

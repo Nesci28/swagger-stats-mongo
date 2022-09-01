@@ -9,7 +9,7 @@ const http = require("http");
 // We will use it to store expected values
 const debug = require("debug")("swstest:baseline");
 const SwsReqResStats = require("../dist/swsReqResStats.js");
-const SwsUtil = require("../dist/swsUtil.js");
+const { SwsUtil } = require("../dist/swsUtil.js");
 
 const swsTestFixture = require("./testfixture.js");
 const swsTestUtils = require("./testutils.js");

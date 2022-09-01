@@ -42,11 +42,11 @@ export class SwsAPIStats {
 
   private apiMatchIndex = {};
 
-  private apiDefs: ApiDefs = {};
+  private apidefs: ApiDefs = {};
 
-  private apiStats: ApiStats = {};
+  private apistats: ApiStats = {};
 
-  private apiDetails: ApiDetails = {};
+  private apidetails: ApiDetails = {};
 
   private durationBuckets = [
     5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000,
@@ -63,11 +63,11 @@ export class SwsAPIStats {
   private promClientMetrics: AllMetrics = {};
 
   public getAPIDefs(): ApiDefs {
-    return this.apiDefs;
+    return this.apidefs;
   }
 
   public getAPIStats(): ApiStats {
-    return this.apiStats;
+    return this.apistats;
   }
 
   public getAPIOperationStats(
@@ -82,18 +82,18 @@ export class SwsAPIStats {
     res[path][method] = {};
 
     // api op defs
-    if (path in this.apiDefs && method in this.apiDefs[path]) {
-      res[path][method].defs = this.apiDefs[path][method];
+    if (path in this.apidefs && method in this.apidefs[path]) {
+      res[path][method].defs = this.apidefs[path][method];
     }
 
     // api op stats
-    if (path in this.apiStats && method in this.apiStats[path]) {
-      res[path][method].stats = this.apiStats[path][method];
+    if (path in this.apistats && method in this.apistats[path]) {
+      res[path][method].stats = this.apistats[path][method];
     }
 
     // api op details
-    if (path in this.apiDetails && method in this.apiDetails[path]) {
-      res[path][method].details = this.apiDetails[path][method];
+    if (path in this.apidetails && method in this.apidetails[path]) {
+      res[path][method].details = this.apidetails[path][method];
     }
 
     return res;
@@ -219,10 +219,10 @@ export class SwsAPIStats {
           this.apiMatchIndex[fullPath].methods[opMethod] = apiOpDef;
 
           // Store in API Operation definitions. Stored separately so only definition can be retrieved
-          if (!(fullPath in this.apiDefs)) {
-            this.apiDefs[fullPath] = {} as ApiDefsMethod;
+          if (!(fullPath in this.apidefs)) {
+            this.apidefs[fullPath] = {} as ApiDefsMethod;
           }
-          this.apiDefs[fullPath][opMethod] = apiOpDef;
+          this.apidefs[fullPath][opMethod] = apiOpDef;
 
           // Create Stats for this API Operation; stats stored separately so only stats can be retrieved
           this.getAPIOpStats(fullPath, opMethod);
@@ -309,41 +309,41 @@ export class SwsAPIStats {
 
   // Get or create API Operation Details
   private getApiOpDetails(path: string, method: HTTPMethod): ApiDetail {
-    if (!(path in this.apiDetails)) {
-      this.apiDetails[path] = {} as ApiDetailsMethod;
+    if (!(path in this.apidetails)) {
+      this.apidetails[path] = {} as ApiDetailsMethod;
     }
-    if (!(method in this.apiDetails[path]))
-      this.apiDetails[path][method] = {
+    if (!(method in this.apidetails[path]))
+      this.apidetails[path][method] = {
         duration: new SwsBucketStats(this.durationBuckets),
         req_size: new SwsBucketStats(this.requestSizeBuckets),
         res_size: new SwsBucketStats(this.responseSizeBuckets),
         code: { 200: { count: 0 } },
       };
 
-    return this.apiDetails[path][method];
+    return this.apidetails[path][method];
   }
 
   // Get or create API Operation Stats
   private getAPIOpStats(path: string, method: HTTPMethod): SwsReqResStats {
-    if (!(path in this.apiStats)) {
-      this.apiStats[path] = {} as ApiStatsMethod;
+    if (!(path in this.apistats)) {
+      this.apistats[path] = {} as ApiStatsMethod;
     }
-    if (!(method in this.apiStats[path]))
-      this.apiStats[path][method] = new SwsReqResStats(
+    if (!(method in this.apistats[path]))
+      this.apistats[path][method] = new SwsReqResStats(
         this.options!.apdexThreshold,
       );
 
-    return this.apiStats[path][method];
+    return this.apistats[path][method];
   }
 
   // Update and stats per tick
   public tick(totalElapsedSec: number): void {
     // Update Rates in apistats
     // eslint-disable-next-line no-restricted-syntax
-    for (const path of Object.keys(this.apiStats)) {
+    for (const path of Object.keys(this.apistats)) {
       // eslint-disable-next-line no-restricted-syntax
-      for (const method of Object.keys(this.apiStats[path])) {
-        this.apiStats[path][method as HTTPMethod].updateRates(totalElapsedSec);
+      for (const method of Object.keys(this.apistats[path])) {
+        this.apistats[path][method as HTTPMethod].updateRates(totalElapsedSec);
       }
     }
   }

@@ -281,7 +281,7 @@ class SwsProcessor {
   private getRemoteRealIP(req: SwsRequest): string {
     let remoteaddress;
     const xfwd = req.headers["x-forwarded-for"];
-    if (xfwd && xfwd instanceof String) {
+    if (xfwd && typeof xfwd === "string") {
       const fwdaddrs = xfwd.split(","); // Could be "client IP, proxy 1 IP, proxy 2 IP"
       // eslint-disable-next-line prefer-destructuring
       remoteaddress = fwdaddrs[0];

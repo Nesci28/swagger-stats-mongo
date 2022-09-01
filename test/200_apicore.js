@@ -116,7 +116,6 @@ parser.validate(swaggerSpecUrl, (err, api) => {
               const opMethod = op.toUpperCase();
 
               debug("Detected: %s %s", opMethod, path);
-
               // We must find the same API (path+method) in swagger-stats
               apiStatsInitial.apidefs.should.have.property(fullPath);
               apiStatsInitial.apidefs[fullPath].should.have.property(opMethod);
