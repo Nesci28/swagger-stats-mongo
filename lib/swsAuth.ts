@@ -1,9 +1,10 @@
 import basicAuth from "basic-auth";
 import Cookies from "cookies";
-import { Request, Response } from "express";
 import { FindOneResult } from "monk";
 import { v1 } from "uuid";
 
+import { SwsRequest } from "./interfaces/request.interface";
+import { SwsResponse } from "./interfaces/response.interface";
 import { Session } from "./interfaces/session.interface";
 import { SwsMongo } from "./swsMongo";
 import swsSettings from "./swsSettings";
@@ -60,7 +61,10 @@ export class SwsAuth {
     await Promise.all(archiveByIdSessionPromises);
   }
 
-  public async processAuth(req: Request, res: Response): Promise<boolean> {
+  public async processAuth(
+    req: SwsRequest,
+    res: SwsResponse,
+  ): Promise<boolean> {
     if (!swsSettings.authentication) {
       return true;
     }
@@ -141,7 +145,7 @@ export class SwsAuth {
     return false;
   }
 
-  public async processLogout(req: Request, res: Response): Promise<void> {
+  public async processLogout(req: SwsRequest, res: SwsResponse): Promise<void> {
     const cookies = new Cookies(req, res);
     const sessionIdCookie = cookies.get("sws-session-id");
     if (sessionIdCookie !== undefined && sessionIdCookie !== null) {

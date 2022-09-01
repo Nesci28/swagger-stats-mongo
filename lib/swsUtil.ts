@@ -1,10 +1,10 @@
 /* eslint-disable no-bitwise */
+import { CpuUsage } from "./interfaces/cpu-usage.interface";
+
 /*
  * Created by sv2 on 3/15/17.
  * swagger-stats utilities
  */
-import { CpuUsage } from "./interfaces/cpu-usage.interface";
-
 export class SwsUtil {
   public static supportedOptions = {
     // Name. Defaults to hostname if not specified
@@ -210,7 +210,7 @@ export class SwsUtil {
         const casted = {};
         // eslint-disable-next-line no-restricted-syntax
         for (const prop of Object.keys(val)) {
-          casted[prop] = module.exports.swsCastStringR(val[prop]);
+          casted[prop] = this.swsCastStringR(val[prop]);
         }
         return casted;
       default:

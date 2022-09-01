@@ -16,6 +16,16 @@ export interface ApiDetail {
   req_size: SwsBucketStats;
   res_size: SwsBucketStats;
   code: ApiDetailsStatusCode;
+  parameters?: {
+    [key: string]: Parameter;
+  };
+}
+
+export interface Parameter {
+  hits: number;
+  in: string;
+  misses: number;
+  required?: boolean;
 }
 
 export type ApiDetailsStatusCode = {

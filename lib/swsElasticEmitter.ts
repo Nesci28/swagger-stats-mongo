@@ -11,24 +11,26 @@ import { SwsUtil } from "./swsUtil";
 const indexTemplate = require("../schema/elasticsearch/api_index_template.json");
 const indexTemplate7X = require("../schema/elasticsearch/api_index_template_7x.json");
 
-const ES_MAX_BUFF = 50;
-
 interface Options {
   url: string;
-  json: boolean;
+  json?: boolean;
   key: string;
   cert: string;
   auth?: {
     username: string;
     password: string;
   };
+  headers?: {
+    "Content-Type": string;
+  };
+  body?: string;
 }
 
 // ElasticSearch Emitter. Store Request/Response records in Elasticsearch
 export class SwsElasticEmitter {
   private debug = Debug("sws:elastic");
 
-  private options = null;
+  private ES_MAX_BUFF = 50;
 
   private es7 = true;
 
@@ -42,15 +44,9 @@ export class SwsElasticEmitter {
 
   private elasticURLBulk: string;
 
-  private elasticProto = null;
+  private elasticUsername: string;
 
-  private elasticHostname = null;
-
-  private elasticPort = null;
-
-  private elasticUsername = null;
-
-  private elasticPassword = null;
+  private elasticPassword: string;
 
   private elasticsearchCert: string;
 
@@ -64,8 +60,6 @@ export class SwsElasticEmitter {
   public initialize(swsOptions): void {
     if (typeof swsOptions === "undefined") return;
     if (!swsOptions) return;
-
-    this.options = swsOptions;
 
     // Set or detect hostname
     if (!(SwsUtil.supportedOptions.elasticsearch in swsOptions)) {
@@ -250,7 +244,7 @@ export class SwsElasticEmitter {
 
     this.bufferCount += 1;
 
-    if (this.bufferCount >= ES_MAX_BUFF) {
+    if (this.bufferCount >= this.ES_MAX_BUFF) {
       this.flush();
     }
   }
@@ -262,7 +256,7 @@ export class SwsElasticEmitter {
 
     this.lastFlush = Date.now();
 
-    const options = {
+    const options: Options = {
       url: this.elasticURLBulk,
       headers: {
         "Content-Type": "application/x-ndjson",

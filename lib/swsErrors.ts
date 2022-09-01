@@ -3,8 +3,7 @@
  * Created by sv2 on 2/18/17.
  * Errors stats
  */
-import { Response } from "express";
-
+import { SwsResponse } from "./interfaces/response.interface";
 import { StatusCodeCount } from "./interfaces/status-code-count.interface";
 import { SwsUtil } from "./swsUtil";
 
@@ -38,7 +37,7 @@ export class SwsErrors {
   }
 
   // Add information about error
-  public countResponse(res: Response & { _swsReq: any }): void {
+  public countResponse(res: SwsResponse): void {
     if (!SwsUtil.isError(res.statusCode)) return;
 
     // Increase count by code

@@ -2,25 +2,30 @@
  * Created by sv2 on 2/16/17.
  */
 
-const path = require("path");
-const url = require("url");
-const debug = require("debug")("sws:interface");
-const promClient = require("prom-client");
-const send = require("send");
-const qs = require("qs");
-const swsSettings = require("./swsSettings.js");
-const swsProcessor = require("./swsProcessor.js");
-const swsEgress = require("./swsEgress.js");
-const SwsAuth = require("./swsAuth.js");
-const SwsMongo = require("./swsMongo.js");
+import Debug from "debug";
+import { NextFunction } from "express";
+import path from "path";
+import promClient from "prom-client";
+import qs from "qs";
+import send from "send";
+import url from "url";
+
+import { SwsRequest } from "./interfaces/request.interface";
+import { SwsResponse } from "./interfaces/response.interface";
+import { SwsAuth } from "./swsAuth";
+import swsEgress from "./swsEgress";
+import { SwsMongo } from "./swsMongo";
+import swsProcessor from "./swsProcessor";
+import swsSettings from "./swsSettings";
 
 let swsMongo;
 let swsAuth;
+const debug = Debug("sws:interface");
 
 // Request hanlder
-function handleRequest(req, res) {
+function handleRequest(req: SwsRequest, res: SwsResponse): void {
   try {
-    swsProcessor.processRequest(req, res);
+    swsProcessor.processRequest(req);
   } catch (e) {
     debug(`SWS:processRequest:ERROR: ${e}`);
     return;
@@ -34,12 +39,12 @@ function handleRequest(req, res) {
   // Setup handler for finishing reponse
   // eslint-disable-next-line func-names
   res.on("finish", function () {
-    handleResponseFinished(this);
+    handleResponseFinished(this as any);
   });
 }
 
 // Response finish hanlder
-function handleResponseFinished(res) {
+function handleResponseFinished(res: SwsResponse): void {
   try {
     swsProcessor.processResponse(res);
   } catch (e) {
@@ -50,7 +55,10 @@ function handleResponseFinished(res) {
 // Process /swagger-stats/stats request
 // Return statistics according to request parameters
 // Query parameters (fields, path, method) defines which stat fields to return
-async function processGetStats(req, res) {
+async function processGetStats(
+  req: SwsRequest,
+  res: SwsResponse,
+): Promise<void> {
   const authResult = await swsAuth.processAuth(req, res);
   if (!authResult) {
     return;
@@ -65,7 +73,10 @@ async function processGetStats(req, res) {
 
 // Process /swagger-stats/metrics request
 // Return all metrics for Prometheus
-async function processGetMetrics(req, res) {
+async function processGetMetrics(
+  req: SwsRequest,
+  res: SwsResponse,
+): Promise<void> {
   const authResult = await swsAuth.processAuth(req, res);
   if (!authResult) {
     return;
@@ -78,9 +89,9 @@ async function processGetMetrics(req, res) {
 }
 
 // Process /swagger-stats/ux request
-function processGetUX(req, res) {
+function processGetUX(req: SwsRequest, res: SwsResponse): void {
   // alwauys serve ux, it will perform auth as needed
-  let fileName = null;
+  let fileName;
   if (req.url === swsSettings.pathUX) {
     fileName = "index.html";
   } else {
@@ -100,7 +111,11 @@ function processGetUX(req, res) {
 }
 
 // Express Middleware
-async function expressMiddleware(options) {
+async function expressMiddleware(
+  options,
+): Promise<
+  (req: SwsRequest, res: SwsResponse, next: NextFunction) => Promise<void>
+> {
   // Init settings
   swsSettings.init(options);
 
@@ -114,22 +129,22 @@ async function expressMiddleware(options) {
   // Init probes
   swsEgress.init();
 
-  swsProcessor.init(swsMongo);
+  swsProcessor.init();
 
-  const fn = async (req, res, next) => {
+  const fn = async (
+    req: SwsRequest,
+    res: SwsResponse,
+    next: NextFunction,
+  ): Promise<void> => {
     try {
       res._swsReq = req;
       req.sws = {};
-      req.sws.query = qs.parse(url.parse(req.url).query);
+      req.sws.query = qs.parse(url.parse(req.url).query!);
 
       // Respond to requests handled by swagger-stats
       // swagger-stats requests will not be counted in statistics
       if (req.url === swsSettings.uriPath) {
-        if ("serverName" in req && req.serverName === "restify") {
-          res.redirect(`${swsSettings.uriPath}/`, next);
-        } else {
-          res.redirect(`${swsSettings.uriPath}/`);
-        }
+        res.redirect(`${swsSettings.uriPath}/`);
         return;
       }
       if (req.url.startsWith(swsSettings.pathStats)) {
@@ -157,27 +172,29 @@ async function expressMiddleware(options) {
   return fn;
 }
 
-module.exports = {
+export default {
   getMiddleware: expressMiddleware,
 
   // TODO Support specifying which stat fields to return
   // Returns object with collected statistics
-  getCoreStats() {
+  getCoreStats(): {
+    startts: number;
+  } {
     return swsProcessor.getStats();
   },
 
   // Allow get stats as prometheus format
-  getPromStats() {
+  async getPromStats(): Promise<string> {
     return promClient.register.metrics();
   },
 
   // Expose promClient to allow for custom metrics by application
-  getPromClient() {
+  getPromClient(): typeof promClient {
     return promClient;
   },
 
   // Stop the processor so that Node.js can exit
-  stop() {
+  stop(): void {
     return swsProcessor.stop();
   },
 };

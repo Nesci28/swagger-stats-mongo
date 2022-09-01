@@ -4,20 +4,17 @@
  * Last Errors
  */
 
-const swsUtil = require("./swsUtil.js");
+import { SwsUtil } from "./swsUtil";
 
-class SwsLastErrors {
-  constructor() {
-    // Store Last 100 errors
-    this.last_errors = [];
-  }
+export class SwsLastErrors {
+  private last_errors: any[] = [];
 
-  getStats() {
+  public getStats(): any[] {
     return this.last_errors;
   }
 
   // Add information about last error
-  addError(rrr) {
+  public addError(rrr): void {
     this.last_errors.push(rrr);
     // Clean up if more than allowed
     if (this.last_errors.length > 100) {
@@ -26,11 +23,9 @@ class SwsLastErrors {
   }
 
   // Check if this qualifies as longest request, and store is yes
-  processReqResData(rrr) {
-    if (swsUtil.isError(rrr.http.response.code)) {
+  public processReqResData(rrr): void {
+    if (SwsUtil.isError(rrr.http.response.code)) {
       this.addError(rrr);
     }
   }
 }
-
-module.exports = SwsLastErrors;

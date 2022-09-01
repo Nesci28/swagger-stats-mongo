@@ -4,7 +4,6 @@
  * Request / Response statistics
  */
 
-import { SwsMongo } from "./swsMongo";
 import { SwsUtil } from "./swsUtil";
 
 // Request / Response statistics
@@ -15,16 +14,6 @@ export class SwsReqResStats {
   private responses = 0; // Total number of responses sent
 
   private errors = 0; // Total number of error responses
-
-  private info = 0; // Total number of informational responses
-
-  private success = 0; // Total number of success responses
-
-  private redirect = 0; // Total number of redirection responses
-
-  private client_error = 0; // Total number of client error responses
-
-  private server_error = 0; // Total number of server error responses
 
   private total_time = 0; // Sum of total processing time (from request received to response finished)
 
@@ -57,10 +46,7 @@ export class SwsReqResStats {
 
   private apdex_score = 0; // Apdex score: (apdex_satisfied + (apdex_tolerated/2))/responses
 
-  constructor(
-    private readonly apdexThreshold: number,
-    private readonly swsMongo: SwsMongo,
-  ) {}
+  constructor(private readonly apdexThreshold: number | undefined) {}
 
   public countRequest(clength: number): void {
     this.requests += 1;

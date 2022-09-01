@@ -5,15 +5,14 @@ export interface ApiDefs {
 }
 
 export type ApiDefsMethod = {
-  [key in HTTPMethod]: {
-    swagger: boolean;
-    deprecated: boolean;
-    description?: string;
-    operationId?: string;
-    summary?: string;
-    tags?: string;
-
-    // Store in match index
-    // this.apiMatchIndex[fullPath].methods[opMethod] = apiOpDef;
-  };
+  [key in HTTPMethod]: ApiDef;
 };
+
+export interface ApiDef {
+  swagger?: boolean;
+  deprecated?: boolean;
+  description?: string;
+  operationId?: string;
+  summary?: string;
+  tags?: string;
+}

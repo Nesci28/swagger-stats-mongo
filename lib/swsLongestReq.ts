@@ -5,30 +5,32 @@
  * Requests with longest observed handle time, since star
  */
 
-class SwsLongestRequests {
-  constructor() {
-    // Highest duration from all stored requests
-    this.highest = -1;
+interface LongestRequest {
+  responsetime: number;
+}
 
-    // Lowest duration from all stored requests
-    this.lowest = -1; // will be updated by first request
+export class SwsLongestRequests {
+  // Highest duration from all stored requests
+  private highest = -1;
 
-    // Max number of requests to keep.
-    // Should not be too big as we're going keep ordered array of longest requests
-    this.capacity = 100;
+  // Lowest duration from all stored requests
+  private lowest = -1; // will be updated by first request
 
-    // true if full
-    this.full = false;
+  // Max number of requests to keep.
+  // Should not be too big as we're going keep ordered array of longest requests
+  private capacity = 100;
 
-    // Store 100 longest requests
-    this.longest_requests = [];
-  }
+  // true if full
+  private full = false;
 
-  getStats() {
+  // Store 100 longest requests
+  private longest_requests: LongestRequest[] = [];
+
+  public getStats(): LongestRequest[] {
     return this.longest_requests;
   }
 
-  placeReqResData(rrr) {
+  private placeReqResData(rrr: LongestRequest): void {
     const duration = rrr.responsetime;
 
     if (duration >= this.highest) {
@@ -59,7 +61,7 @@ class SwsLongestRequests {
   }
 
   // Check if this qualifies as longest request, and store is yes
-  processReqResData(rrr) {
+  public processReqResData(rrr: LongestRequest): void {
     const duration = rrr.responsetime;
 
     if (!this.full) {
@@ -81,5 +83,3 @@ class SwsLongestRequests {
     this.placeReqResData(rrr);
   }
 }
-
-module.exports = SwsLongestRequests;

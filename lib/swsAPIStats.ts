@@ -4,27 +4,30 @@
  * API Statistics
  */
 import Debug from "debug";
-import { pathToRegexp } from "path-to-regexp";
+import { Key, pathToRegexp } from "path-to-regexp";
+import promClient from "prom-client";
 
+import { AllMetrics } from "./interfaces/all-metrics.interface";
+import {
+  ApiDef,
+  ApiDefs,
+  ApiDefsMethod,
+} from "./interfaces/api-defs.interface";
 import {
   ApiDetail,
   ApiDetails,
   ApiDetailsMethod,
 } from "./interfaces/api-details.interface";
 import { APIOperationStats } from "./interfaces/api-operation-stats.interface";
-import {
-  ApiDefs,
-  ApiStats,
-  ApiStatsMethod,
-} from "./interfaces/api-stats.interface";
+import { ApiStats, ApiStatsMethod } from "./interfaces/api-stats.interface";
 import { HTTPMethod } from "./interfaces/http-method.interface";
-import SwsMongo from "./swsMongo";
+import { SwsRequest } from "./interfaces/request.interface";
+import { SwsResponse } from "./interfaces/response.interface";
+import { SwsBucketStats } from "./swsBucketStats";
+import swsMetrics from "./swsMetrics";
 import { SwsReqResStats } from "./swsReqResStats";
 import swsSettings from "./swsSettings";
 import { SwsUtil } from "./swsUtil";
-
-const swsMetrics = require("./swsMetrics.js");
-const SwsBucketStats = require("./swsBucketStats.js");
 
 // API Statistics
 // Stores Definition of API based on Swagger Spec
@@ -33,7 +36,7 @@ const SwsBucketStats = require("./swsBucketStats.js");
 export class SwsAPIStats {
   private debug = Debug("sws:apistats");
 
-  private options = null;
+  private options: any;
 
   private basePath = "/";
 
@@ -57,9 +60,7 @@ export class SwsAPIStats {
     5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000,
   ];
 
-  private promClientMetrics = {};
-
-  constructor(private readonly swsMongo: SwsMongo) {}
+  private promClientMetrics: AllMetrics = {};
 
   public getAPIDefs(): ApiDefs {
     return this.apiDefs;
@@ -126,8 +127,10 @@ export class SwsAPIStats {
   }
 
   public initialize(swsOptions): void {
-    // TODO remove
-    if (!swsOptions) return;
+    if (!swsOptions) {
+      return;
+    }
+
     this.options = swsOptions;
 
     this.durationBuckets = swsSettings.durationBuckets;
@@ -166,7 +169,7 @@ export class SwsAPIStats {
       const fullPath = this.getFullPath(path);
 
       // by default, regex is null
-      const keys = [];
+      const keys: Key[] = [];
       let re: RegExp | undefined;
 
       // Convert to express path
@@ -203,7 +206,7 @@ export class SwsAPIStats {
           const opDef = pathDef[op];
           const opMethod = op.toUpperCase() as HTTPMethod;
 
-          const apiOpDef: ApiDefs = {}; // API Operation definition
+          const apiOpDef: ApiDef = {}; // API Operation definition
           apiOpDef.swagger = true; // by definition
           apiOpDef.deprecated =
             "deprecated" in opDef ? opDef.deprecated : false;
@@ -216,7 +219,9 @@ export class SwsAPIStats {
           this.apiMatchIndex[fullPath].methods[opMethod] = apiOpDef;
 
           // Store in API Operation definitions. Stored separately so only definition can be retrieved
-          if (!(fullPath in this.apiDefs)) this.apiDefs[fullPath] = {};
+          if (!(fullPath in this.apiDefs)) {
+            this.apiDefs[fullPath] = {} as ApiDefsMethod;
+          }
           this.apiDefs[fullPath][opMethod] = apiOpDef;
 
           // Create Stats for this API Operation; stats stored separately so only stats can be retrieved
@@ -268,9 +273,11 @@ export class SwsAPIStats {
     }
   }
 
-  private processSingleParameter(apidetailsEntry, param): void {
-    // eslint-disable-next-line no-param-reassign
-    if (!("parameters" in apidetailsEntry)) apidetailsEntry.parameters = {};
+  private processSingleParameter(apidetailsEntry: ApiDetail, param): void {
+    if (!("parameters" in apidetailsEntry)) {
+      // eslint-disable-next-line no-param-reassign
+      apidetailsEntry.parameters = {};
+    }
     const params = apidetailsEntry.parameters;
 
     const pname = "name" in param ? param.name : null;
@@ -323,8 +330,7 @@ export class SwsAPIStats {
     }
     if (!(method in this.apiStats[path]))
       this.apiStats[path][method] = new SwsReqResStats(
-        this.options.apdexThreshold,
-        this.swsMongo,
+        this.options!.apdexThreshold,
       );
 
     return this.apiStats[path][method];
@@ -337,14 +343,19 @@ export class SwsAPIStats {
     for (const path of Object.keys(this.apiStats)) {
       // eslint-disable-next-line no-restricted-syntax
       for (const method of Object.keys(this.apiStats[path])) {
-        this.apiStats[path][method].updateRates(totalElapsedSec);
+        this.apiStats[path][method as HTTPMethod].updateRates(totalElapsedSec);
       }
     }
   }
 
   // Extract path parameter values based on successful path match results
-  private extractPathParams(matchResult, keys) {
-    const pathParams = {};
+  private extractPathParams(
+    matchResult: any[],
+    keys: { name: string }[],
+  ): {
+    [key: string]: string;
+  } {
+    const pathParams: { [key: string]: string } = {};
     for (let i = 0; i < keys.length; i += 1) {
       if ("name" in keys[i]) {
         const vidx = i + 1; // first element in match result is URI
@@ -358,7 +369,7 @@ export class SwsAPIStats {
   }
 
   // Try to match request to API to known API definition
-  matchRequest(req) {
+  public matchRequest(req: SwsRequest): void {
     let url = req.sws.originalUrl;
     // Handle "/pets" and "/pets/" the same way - #105
     if (url.endsWith("/")) {
@@ -373,10 +384,10 @@ export class SwsAPIStats {
       url = url.substring(0, qidx);
     }
 
-    let matchEntry = null;
-    let apiPath = null;
-    let apiPathParams = null;
-    let apiInfo = null;
+    let matchEntry;
+    let apiPath;
+    let apiPathParams;
+    let apiInfo;
 
     // First check if we can find exact match in apiMatchIndex
     if (url in this.apiMatchIndex) {
@@ -428,12 +439,18 @@ export class SwsAPIStats {
   // Hit: parameter present
   // Miss: mandatory parameter is missing
   // Only supported path and query parameters
-  countParametersStats(path, method, req) {
+  private countParametersStats(
+    path: string,
+    method: HTTPMethod,
+    req: SwsRequest,
+  ): void {
     if (!("swagger" in req.sws) || !req.sws.swagger) return; // Only counting for swagger-defined API Ops
 
     const apiOpDetails = this.getApiOpDetails(path, method);
 
-    if (!("parameters" in apiOpDetails)) return; // Only counting if parameters spec is there
+    if (!("parameters" in apiOpDetails) || !apiOpDetails.parameters) {
+      return; // Only counting if parameters spec is there
+    }
 
     // eslint-disable-next-line no-restricted-syntax
     for (const pname of Object.keys(apiOpDetails.parameters)) {
@@ -462,14 +479,20 @@ export class SwsAPIStats {
 
   // Get Api Operation Parameter Values per specification
   // Only supported path and query parameters
-  getApiOpParameterValues(path, method, req) {
+  getApiOpParameterValues(
+    path: string,
+    method: HTTPMethod,
+    req: SwsRequest,
+  ): { [key: string]: string } | null {
     if (!("swagger" in req.sws) || !req.sws.swagger) return null; // Only for swagger-defined API Ops
 
     const apiOpDetails = this.getApiOpDetails(path, method);
 
-    if (!("parameters" in apiOpDetails)) return null; // Only if parameters spec is there
+    if (!("parameters" in apiOpDetails) || !apiOpDetails.parameters) {
+      return null; // Only if parameters spec is there
+    }
 
-    const paramValues = {};
+    const paramValues: { [key: string]: string } = {};
 
     // eslint-disable-next-line no-restricted-syntax
     for (const pname of Object.keys(apiOpDetails.parameters)) {
@@ -500,17 +523,24 @@ export class SwsAPIStats {
   }
 
   // Count request
-  async countRequest(req, res) {
+  public countRequest(req: SwsRequest): void {
     // Count request if it was matched to API Operation
     if ("match" in req.sws && req.sws.match) {
-      const apiOpStats = this.getAPIOpStats(req.sws.api_path, req.method);
-      await apiOpStats.countRequest(req.sws.req_clength);
-      this.countParametersStats(req.sws.api_path, req.method, req, res);
+      const apiOpStats = this.getAPIOpStats(
+        req.sws.api_path,
+        req.method as HTTPMethod,
+      );
+      apiOpStats.countRequest(req.sws.req_clength);
+      this.countParametersStats(
+        req.sws.api_path,
+        req.method as HTTPMethod,
+        req,
+      );
     }
   }
 
   // Count finished response
-  countResponse(res) {
+  public countResponse(res: SwsResponse): void {
     const req = res._swsReq;
     const codeclass = SwsUtil.getStatusCodeClass(res.statusCode);
 
@@ -552,20 +582,30 @@ export class SwsAPIStats {
     apiOpDetails.res_size.countValue(req.sws.res_clength);
 
     // update Prometheus metrics
-    this.promClientMetrics.api_request_total
-      .labels(req.method, req.sws.api_path, res.statusCode)
+    (this.promClientMetrics.api_request_total as promClient.Gauge<string>)
+      .labels(req.method, req.sws.api_path, res.statusCode.toString())
       .inc();
 
-    this.promClientMetrics.api_request_duration_milliseconds
-      .labels(req.method, req.sws.api_path, res.statusCode)
-      .observe(req.sws.duration);
-    this.promClientMetrics.api_request_size_bytes
-      .labels(req.method, req.sws.api_path, res.statusCode)
-      .observe(req.sws.req_clength);
-    this.promClientMetrics.api_response_size_bytes
-      .labels(req.method, req.sws.api_path, res.statusCode)
-      .observe(req.sws.res_clength);
+    (
+      this.promClientMetrics.api_request_duration_milliseconds.labels(
+        req.method,
+        req.sws.api_path,
+        res.statusCode.toString(),
+      ) as promClient.Histogram<string>
+    ).observe(req.sws.duration);
+    (
+      this.promClientMetrics.api_request_size_bytes.labels(
+        req.method,
+        req.sws.api_path,
+        res.statusCode.toString(),
+      ) as promClient.Histogram<string>
+    ).observe(req.sws.req_clength);
+    (
+      this.promClientMetrics.api_response_size_bytes.labels(
+        req.method,
+        req.sws.api_path,
+        res.statusCode.toString(),
+      ) as promClient.Histogram<string>
+    ).observe(req.sws.res_clength);
   }
 }
-
-module.exports = SwsAPIStats;

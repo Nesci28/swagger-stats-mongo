@@ -7,19 +7,16 @@ import os from "os";
 /* swagger=stats settings */
 class SwsSettings {
   // Hostname. Will attempt to detect if not explicitly provided
-  private hostname = os.hostname();
+  public hostname = os.hostname();
 
   // Name. Defaults to hostname if not specified
-  private name = this.hostname;
+  public name = this.hostname;
 
   // Version
-  private version = "";
+  public version = "";
 
   // IP Address. Will attempt to detect if not provided
-  private ip = "";
-
-  // Swagger specification JSON document. Should be pre-validated and with resolved references. Optional.
-  private swaggerSpec = null;
+  public ip = "";
 
   // Base path for API described in swagger spec.
   // Specify this when using openapi: "3.0.0" specifications
@@ -31,9 +28,6 @@ class SwsSettings {
   // /<uriPath>/ui, /<uriPath>/stats, /<uriPath>/metrics
   // overriding default /swagger-stats/ui
   public uriPath = "/swagger-stats";
-
-  // Duration of timeline bucket in milliseconds, 60000 by default
-  private timelineBucketDuration = 60000;
 
   // Buckets for duration histogram metrics, in Milliseconds
   // Optional. Default value:
@@ -73,7 +67,7 @@ class SwsSettings {
   // - req - request
   // - res - response
   // - rrr - Request Response Record (RRR)
-  private onResponseFinish = null;
+  public onResponseFinish = null;
 
   // Enable Basic authentication: true or false. Default false.
   // Basic & custom authentication are supported
@@ -105,27 +99,8 @@ class SwsSettings {
   // Default is 900 seconds
   public sessionMaxAge = 900;
 
-  // ElasticSearch URL. Enables storing of request response records in Elasticsearch.
-  // Default is empty (disabled).
-  private elasticsearch = null;
-
-  // Prefix for Elasticsearch index. Default is "api-"
-  private elasticsearchIndexPrefix = "api-";
-
-  // Username for Elasticsearch, if anonymous user is disbaled . Default is empty (disabled)
-  private elasticsearchUsername = null;
-
-  // Password for Elasticsearch, if anonymous user is disbaled . Default is empty (disabled)
-  private elasticsearchPassword = null;
-
-  // Elasticsearch key for SSL connection
-  private elasticsearchKey = null;
-
-  // Elasticsearch certificat for SSL connection
-  private elasticsearchCert = null;
-
   // Set to true to track only requests defined in swagger spec. Default false.
-  private swaggerOnly = false;
+  public swaggerOnly = false;
 
   // Prometheus metrics prefix. Will be prepended to metric name if specified.
   public metricsPrefix = "";
@@ -137,13 +112,13 @@ class SwsSettings {
 
   private pathDist = "/swagger-stats/dist";
 
-  private pathUX = "/swagger-stats/ux";
+  public pathUX = "/swagger-stats/ux";
 
   public pathStats = "/swagger-stats/stats";
 
-  private pathMetrics = "/swagger-stats/metrics";
+  public pathMetrics = "/swagger-stats/metrics";
 
-  private pathLogout = "/swagger-stats/logout";
+  public pathLogout = "/swagger-stats/logout";
 
   public init(options): void {
     if (typeof options === "undefined" || !options) {
@@ -161,12 +136,12 @@ class SwsSettings {
     if (!("ip" in options)) {
       // Attempt to detect network address
       // Use first found interface name which starts from "e" ( en0, em0 ... )
-      let address = null;
+      let address;
       const ifaces = os.networkInterfaces();
       // eslint-disable-next-line no-restricted-syntax
       for (const ifacename of Object.keys(ifaces)) {
         const iface = ifaces[ifacename];
-        if (!address && !iface.internal && ifacename.charAt(0) === "e") {
+        if (!address && ifacename.charAt(0) === "e") {
           if (iface instanceof Array && iface.length > 0) {
             address = iface[0].address;
           }

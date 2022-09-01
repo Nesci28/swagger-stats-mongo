@@ -35,3 +35,4 @@ jsdoc
 .c9
 .idea
 .vscode
+dist/

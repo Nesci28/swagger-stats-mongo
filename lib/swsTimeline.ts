@@ -3,48 +3,75 @@
  * Created by sv2 on 2/18/17.
  * Timeline Statistics
  */
+import { Request, Response } from "express";
 
-const swsUtil = require("./swsUtil.js");
-const SwsReqResStats = require("./swsReqResStats.js");
+import { SwsReqResStats } from "./swsReqResStats";
+import { SwsUtil } from "./swsUtil";
 
-class SwsTimeline {
-  constructor() {
-    // Options
-    this.options = null;
+interface GetStats {
+  settings: {
+    bucket_duration: number;
+    bucket_current: number;
+    length: number;
+  };
+  data: {};
+}
 
-    // Timeline Settings
-    this.settings = {
-      bucket_duration: 60000, // Timeline bucket duration in milliseconds
-      bucket_current: 0, // Current Timeline bucket ID
-      length: 60, // Timeline length - number of buckets to keep
-    };
+interface Datas {
+  [key: number]: Data;
+}
 
-    // Timeline of req / res statistics, one entry per minute for past 60 minutes
-    // Hash by timestamp divided by settings.bucket_duration, so we can match finished response to bucket
-    this.data = {};
+interface Data {
+  stats: SwsReqResStats;
+  sys: {
+    rss: number;
+    heapTotal: number;
+    heapUsed: number;
+    external: number;
+    cpu: number;
+    lag?: number;
+  };
+}
 
-    this.startTime = process.hrtime();
-    this.startUsage = process.cpuUsage();
+export class SwsTimeline {
+  // Options
+  private options: { apdexThreshold?: number } = {};
 
-    // average memory usage values on time interval
-    this.memorySum = process.memoryUsage();
-    this.memoryMeasurements = 1;
+  // Timeline Settings
+  public settings = {
+    bucket_duration: 60000, // Timeline bucket duration in milliseconds
+    bucket_current: 0, // Current Timeline bucket ID
+    length: 60, // Timeline length - number of buckets to keep
+  };
 
-    // current max event loop lag
-    this.lag = 0;
+  // Timeline of req / res statistics, one entry per minute for past 60 minutes
+  // Hash by timestamp divided by settings.bucket_duration, so we can match finished response to bucket
+  private data: Datas = {};
+
+  private startTime = process.hrtime();
+
+  private startUsage = process.cpuUsage();
+
+  // average memory usage values on time interval
+  private memorySum = process.memoryUsage();
+
+  private memoryMeasurements = 1;
+
+  // current max event loop lag
+  private lag = 0;
+
+  public getStats(): GetStats {
+    const res = { settings: this.settings, data: this.data };
+    return res;
   }
 
-  getStats() {
-    return { settings: this.settings, data: this.data };
-  }
-
-  initialize(swsOptions) {
+  public initialize(swsOptions): void {
     this.options = swsOptions;
 
     const curr = Date.now();
-    if (swsUtil.supportedOptions.timelineBucketDuration in swsOptions) {
+    if (SwsUtil.supportedOptions.timelineBucketDuration in swsOptions) {
       this.settings.bucket_duration =
-        swsOptions[swsUtil.supportedOptions.timelineBucketDuration];
+        swsOptions[SwsUtil.supportedOptions.timelineBucketDuration];
     }
     let timelineid = Math.floor(curr / this.settings.bucket_duration);
     this.settings.bucket_current = timelineid;
@@ -54,7 +81,7 @@ class SwsTimeline {
     }
   }
 
-  tick(ts) {
+  public tick(ts: number): void {
     const timelineid = Math.floor(ts / this.settings.bucket_duration);
     this.settings.bucket_current = timelineid;
 
@@ -67,16 +94,19 @@ class SwsTimeline {
     currBucket.stats.updateRates(currBucketElapsedSec);
 
     // Update sys stats in current bucket
-    const cpuPercent = swsUtil.swsCPUUsagePct(this.startTime, this.startUsage);
+    const cpuPercent = SwsUtil.swsCPUUsagePct(this.startTime, this.startUsage);
     currBucket.sys.cpu = cpuPercent;
 
     this.updateMemoryUsage(process.memoryUsage());
     this.setMemoryStats(currBucket);
     const start = process.hrtime();
-    setImmediate(this.setMaxEvenLoopLag, start, this);
+    setImmediate(this.setMaxEvenLoopLag, start, this as any);
   }
 
-  setMaxEvenLoopLag(start, dest) {
+  private setMaxEvenLoopLag(
+    start: [number, number],
+    dest: { lag: number },
+  ): void {
     const delta = process.hrtime(start);
     const nanosec = delta[0] * 1e9 + delta[1];
     const mseconds = nanosec / 1e6;
@@ -86,7 +116,7 @@ class SwsTimeline {
     }
   }
 
-  getTimelineBucket(timelineid) {
+  private getTimelineBucket(timelineid: number): Data {
     if (timelineid > 0 && !(timelineid in this.data)) {
       // Open new bucket
       this.openTimelineBucket(timelineid);
@@ -97,15 +127,15 @@ class SwsTimeline {
     return this.data[timelineid];
   }
 
-  openTimelineBucket(timelineid) {
+  private openTimelineBucket(timelineid: number): void {
     // Open new bucket
     this.data[timelineid] = {
-      stats: new SwsReqResStats(this.options.apdexThreshold),
+      stats: new SwsReqResStats(this.options?.apdexThreshold),
       sys: { rss: 0, heapTotal: 0, heapUsed: 0, external: 0, cpu: 0 },
     };
   }
 
-  closeTimelineBucket(timelineid) {
+  private closeTimelineBucket(timelineid: number): void {
     if (!(timelineid in this.data)) return;
 
     // Close bucket
@@ -116,7 +146,7 @@ class SwsTimeline {
     );
 
     // Update sys stats
-    const cpuPercent = swsUtil.swsCPUUsagePct(this.startTime, this.startUsage);
+    const cpuPercent = SwsUtil.swsCPUUsagePct(this.startTime, this.startUsage);
     this.data[timelineid].sys.cpu = cpuPercent;
 
     // debug('CPU: %s on %d', cpuPercent.toFixed(4), timelineid);
@@ -136,16 +166,20 @@ class SwsTimeline {
     this.lag = 0;
 
     this.startTime = process.hrtime();
-    setImmediate(this.setMaxEvenLoopLag, this.startTime, this.data[timelineid]);
+    setImmediate(
+      this.setMaxEvenLoopLag,
+      this.startTime,
+      this.data[timelineid] as any,
+    );
 
     this.startUsage = process.cpuUsage();
   }
 
-  expireTimelineBucket(timelineid) {
+  private expireTimelineBucket(timelineid: number): void {
     delete this.data[timelineid];
   }
 
-  updateMemoryUsage(currMem) {
+  private updateMemoryUsage(currMem): void {
     this.memoryMeasurements += 1;
     this.memorySum.rss += currMem.rss;
     this.memorySum.heapTotal += currMem.heapTotal;
@@ -154,7 +188,7 @@ class SwsTimeline {
     // debug('Mem: %s - CURR %s - UPDATE %d', Math.round(this.memorySum.heapUsed/this.memoryMeasurements),currMem.heapUsed,this.memoryMeasurements);
   }
 
-  setMemoryStats(bucket) {
+  private setMemoryStats(bucket): void {
     if (!("sys" in bucket)) return;
     // eslint-disable-next-line no-param-reassign
     bucket.sys.rss = Math.round(this.memorySum.rss / this.memoryMeasurements);
@@ -172,24 +206,22 @@ class SwsTimeline {
     );
   }
 
-  countRequest(req) {
+  public countRequest(req: Request & { sws: any }): void {
     // Count in timeline
     this.getTimelineBucket(req.sws.timelineid).stats.countRequest(
       req.sws.req_clength,
     );
   }
 
-  countResponse(res) {
+  public countResponse(res: Response & { _swsReq: any }): void {
     const req = res._swsReq;
 
     // Update timeline stats
     this.getTimelineBucket(req.sws.timelineid).stats.countResponse(
       res.statusCode,
-      swsUtil.getStatusCodeClass(res.statusCode),
+      SwsUtil.getStatusCodeClass(res.statusCode),
       req.sws.duration,
       req.sws.res_clength,
     );
   }
 }
-
-module.exports = SwsTimeline;
