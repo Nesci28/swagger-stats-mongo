@@ -70,6 +70,7 @@ parser.validate(specLocation, async (err, api) => {
   if (!err) {
     debug("Success validating swagger file!");
     swaggerSpec = api;
+    console.log("swaggerSpec :>> ", swaggerSpec);
 
     const swsOptions = {
       name: "swagger-stats-spectest",

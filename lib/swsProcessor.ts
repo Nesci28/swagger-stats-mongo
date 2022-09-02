@@ -316,6 +316,7 @@ class SwsProcessor {
   }
 
   public processRequest(req: SwsRequest): void {
+    console.log("processing");
     // Placeholder for sws-specific attributes
     req.sws = req.sws || {};
 
@@ -343,6 +344,8 @@ class SwsProcessor {
     this.apiStats.matchRequest(req);
 
     // if no match, and tracking of non-swagger requests is disabled, return
+    console.log("req.sws.match :>> ", req.sws.match);
+    console.log("this.swaggerOnly :>> ", this.swaggerOnly);
     if (!req.sws.match && this.swaggerOnly) {
       req.sws.track = false;
       return;

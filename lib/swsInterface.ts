@@ -24,6 +24,7 @@ const debug = Debug("sws:interface");
 
 // Request hanlder
 function handleRequest(req: SwsRequest, res: SwsResponse): void {
+  console.log("handling");
   try {
     swsProcessor.processRequest(req);
   } catch (e) {

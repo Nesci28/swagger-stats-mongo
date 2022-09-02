@@ -370,6 +370,7 @@ export class SwsAPIStats {
 
   // Try to match request to API to known API definition
   public matchRequest(req: SwsRequest): void {
+    console.log("mating");
     let url = req.sws.originalUrl;
     // Handle "/pets" and "/pets/" the same way - #105
     if (url.endsWith("/")) {
@@ -389,10 +390,14 @@ export class SwsAPIStats {
     let apiPathParams;
     let apiInfo;
 
+    console.log("url :>> ", url);
+    console.log("this.apiMatchIndex :>> ", this.apiMatchIndex);
+
     // First check if we can find exact match in apiMatchIndex
     if (url in this.apiMatchIndex) {
       matchEntry = this.apiMatchIndex[url];
       apiPath = url;
+      console.log("apiPath :>> ", apiPath);
       this.debug("SWS:MATCH: %s exact match", url);
     } else {
       // if not, search by regex matching
@@ -413,6 +418,8 @@ export class SwsAPIStats {
         }
       }
     }
+
+    console.log("2");
 
     if (matchEntry) {
       if (req.method in matchEntry.methods) {
