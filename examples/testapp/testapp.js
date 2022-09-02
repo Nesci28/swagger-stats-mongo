@@ -69,9 +69,9 @@ parser.validate(swaggerSpec, async (err) => {
       );
 
       // Implement custom API in application to return collected statistics
-      app.get("/stats", (req, res) => {
+      app.get("/stats", async (req, res) => {
         res.setHeader("Content-Type", "application/json");
-        res.send(swsInterface.getCoreStats());
+        res.send(await swsInterface.getCoreStats());
       });
 
       // Connect API Router - it should be the end of the chain

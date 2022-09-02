@@ -90,18 +90,18 @@ export class SwsProcessor {
     this.timeline = new SwsTimeline(this.redis);
   }
 
-  public init(): void {
+  public async init(): Promise<void> {
     this.processOptions();
 
     this.sysStats.initialize();
 
-    this.coreStats.initialize();
+    await this.coreStats.initialize();
 
-    this.coreEgressStats.initialize("egress_");
+    await this.coreEgressStats.initialize("egress_");
 
-    this.timeline.initialize(swsSettings);
+    await this.timeline.initialize(swsSettings);
 
-    this.apiStats.initialize(swsSettings);
+    await this.apiStats.initialize(swsSettings);
 
     this.elasticsearchEmitter.initialize(swsSettings);
 
@@ -333,13 +333,13 @@ export class SwsProcessor {
     }
 
     // Core stats
-    this.coreStats.countRequest(req);
+    await this.coreStats.countRequest(req);
 
     // Timeline
     await this.timeline.countRequest(req);
 
     // TODO Check if needed
-    this.apiStats.countRequest(req);
+    await this.apiStats.countRequest(req);
   }
 
   public async processResponse(res: SwsResponse): Promise<void> {
@@ -414,7 +414,9 @@ export class SwsProcessor {
   }
 
   // Get stats according to fields and params specified in query
-  public getStats(query?: any): { startts: number } & Record<string, unknown> {
+  public async getStats(
+    query?: any,
+  ): Promise<{ startts: number } & Record<string, unknown>> {
     // eslint-disable-next-line no-param-reassign
     query = typeof query !== "undefined" ? query : {};
     // eslint-disable-next-line no-param-reassign
@@ -469,13 +471,13 @@ export class SwsProcessor {
     if (fieldMask & SwsUtil.swsStatFields.apidefs)
       result.apidefs = this.apiStats.getAPIDefs();
     if (fieldMask & SwsUtil.swsStatFields.apistats)
-      result.apistats = this.apiStats.getAPIStats();
+      result.apistats = await this.apiStats.getAPIStats();
     if (fieldMask & SwsUtil.swsStatFields.errors)
       result.errors = this.errorsStats.getStats();
 
     if (fieldMask & SwsUtil.swsStatFields.apiop) {
       if ("path" in query && "method" in query) {
-        result.apiop = this.apiStats.getAPIOperationStats(
+        result.apiop = await this.apiStats.getAPIOperationStats(
           query.path,
           query.method,
         );

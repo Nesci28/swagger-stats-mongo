@@ -40,7 +40,7 @@ export class SwsCoreStats {
   constructor(private readonly redis: Redis) {}
 
   // Initialize
-  public initialize(metricsRolePrefix?: string): void {
+  public async initialize(metricsRolePrefix?: string): Promise<void> {
     this.metricsRolePrefix = metricsRolePrefix || "";
 
     // Statistics for all requests
@@ -74,6 +74,13 @@ export class SwsCoreStats {
         HTTPMethod.DELETE,
       ),
     };
+    await Promise.all([
+      this.all.init(),
+      this.method.GET.init(),
+      this.method.POST.init(),
+      this.method.PUT.init(),
+      this.method.DELETE.init(),
+    ]);
 
     // metrics
     swsMetrics.clearPrometheusMetrics(this.promClientMetrics);
@@ -94,9 +101,9 @@ export class SwsCoreStats {
   }
 
   // Update timeline and stats per tick
-  public tick(totalElapsedSec: number): void {
+  public async tick(totalElapsedSec: number): Promise<void> {
     // Rates
-    this.all.updateRates(totalElapsedSec);
+    await this.all.updateRates(totalElapsedSec);
     // eslint-disable-next-line no-restricted-syntax
     for (const mname of Object.keys(this.method)) {
       this.method[mname].updateRates(totalElapsedSec);
@@ -104,9 +111,9 @@ export class SwsCoreStats {
   }
 
   // Count request
-  public countRequest(req: SwsRequest): void {
+  public async countRequest(req: SwsRequest): Promise<void> {
     // Count in all
-    this.all.countRequest(req.sws.req_clength);
+    await this.all.countRequest(req.sws.req_clength);
 
     // Count by method
     const { method } = req;
@@ -116,8 +123,8 @@ export class SwsCoreStats {
         this.redis,
         method,
       );
+      await this.method[method].countRequest(req.sws.req_clength);
     }
-    this.method[method].countRequest(req.sws.req_clength);
 
     // Update prom-client metrics
     (

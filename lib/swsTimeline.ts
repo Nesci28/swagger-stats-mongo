@@ -69,7 +69,7 @@ export class SwsTimeline {
     return res;
   }
 
-  public initialize(swsOptions): void {
+  public async initialize(swsOptions): Promise<void> {
     this.options = swsOptions;
 
     const curr = Date.now();
@@ -80,22 +80,23 @@ export class SwsTimeline {
     let timelineid = Math.floor(curr / this.settings.bucket_duration);
     this.settings.bucket_current = timelineid;
     for (let i = 0; i < this.settings.length; i += 1) {
-      this.openTimelineBucket(timelineid);
+      // eslint-disable-next-line no-await-in-loop
+      await this.openTimelineBucket(timelineid);
       timelineid -= 1;
     }
   }
 
-  public tick(ts: number): void {
+  public async tick(ts: number): Promise<void> {
     const timelineid = Math.floor(ts / this.settings.bucket_duration);
     this.settings.bucket_current = timelineid;
 
-    const currBucket = this.getTimelineBucket(timelineid);
+    const currBucket = await this.getTimelineBucket(timelineid);
     this.expireTimelineBucket(timelineid - this.settings.length);
 
     // Update rates in timeline, only in current bucket
     const currBucketElapsedSec =
       (ts - timelineid * this.settings.bucket_duration) / 1000;
-    currBucket.stats.updateRates(currBucketElapsedSec);
+    await currBucket.stats.updateRates(currBucketElapsedSec);
 
     // Update sys stats in current bucket
     const cpuPercent = SwsUtil.swsCPUUsagePct(this.startTime, this.startUsage);
@@ -120,10 +121,10 @@ export class SwsTimeline {
     }
   }
 
-  private getTimelineBucket(timelineid: number): Data {
+  private async getTimelineBucket(timelineid: number): Promise<Data> {
     if (timelineid > 0 && !(timelineid in this.data)) {
       // Open new bucket
-      this.openTimelineBucket(timelineid);
+      await this.openTimelineBucket(timelineid);
 
       // Close previous bucket
       this.closeTimelineBucket(timelineid - 1);
@@ -131,7 +132,7 @@ export class SwsTimeline {
     return this.data[timelineid];
   }
 
-  private openTimelineBucket(timelineid: number): void {
+  private async openTimelineBucket(timelineid: number): Promise<void> {
     // Open new bucket
     this.data[timelineid] = {
       stats: new SwsReqResStats(
@@ -141,6 +142,7 @@ export class SwsTimeline {
       ),
       sys: { rss: 0, heapTotal: 0, heapUsed: 0, external: 0, cpu: 0 },
     };
+    await this.data[timelineid].stats.init();
   }
 
   private closeTimelineBucket(timelineid: number): void {
@@ -216,16 +218,16 @@ export class SwsTimeline {
 
   public async countRequest(req: Request & { sws: any }): Promise<void> {
     // Count in timeline
-    const timelineBucket = this.getTimelineBucket(req.sws.timelineid).stats;
-    await timelineBucket.countRequest(req.sws.req_clength);
+    const timelineBucket = await this.getTimelineBucket(req.sws.timelineid);
+    await timelineBucket.stats.countRequest(req.sws.req_clength);
   }
 
   public async countResponse(res: Response & { _swsReq: any }): Promise<void> {
     const req = res._swsReq;
 
     // Update timeline stats
-    const timelineBucket = this.getTimelineBucket(req.sws.timelineid).stats;
-    await timelineBucket.countResponse(
+    const timelineBucket = await this.getTimelineBucket(req.sws.timelineid);
+    await timelineBucket.stats.countResponse(
       res.statusCode,
       SwsUtil.getStatusCodeClass(res.statusCode),
       req.sws.duration,

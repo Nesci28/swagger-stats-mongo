@@ -70,7 +70,7 @@ parser.validate(swaggerSpecUrl, (err, api) => {
               done();
             }
           });
-      });
+      }).timeout(5000);
 
       it("should collect initial statistics values", (done) => {
         apiSpecTest
@@ -286,7 +286,9 @@ parser.validate(swaggerSpecUrl, (err, api) => {
             })
             .expect(200)
             .end((err1, res) => {
-              if (err1) return done(err1);
+              if (err1) {
+                return done(err1);
+              }
 
               res.body.should.not.be.empty;
 
@@ -307,7 +309,7 @@ parser.validate(swaggerSpecUrl, (err, api) => {
               debug("CURRENT STATS: %s", JSON.stringify(apiOpStatsUpdated));
               done();
             });
-        });
+        }).timeout(2000);
 
         // Check statistics values
         it(`should have correct statistics values for ${apiop.label}`, (done) => {
@@ -317,8 +319,24 @@ parser.validate(swaggerSpecUrl, (err, api) => {
           apiOpStatsUpdated.responses.should.be.equal(
             apiOpStatsInitial.responses + 4,
           );
+          console.log(
+            "apiOpStatsUpdated.errors :>> ",
+            apiOpStatsUpdated.errors,
+          );
+          console.log(
+            "apiOpStatsInitial.errors :>> ",
+            apiOpStatsInitial.errors,
+          );
           apiOpStatsUpdated.errors.should.be.equal(
             apiOpStatsInitial.errors + 2,
+          );
+          console.log(
+            "apiOpStatsUpdated.success :>> ",
+            apiOpStatsUpdated.success,
+          );
+          console.log(
+            "apiOpStatsInitial.success :>> ",
+            apiOpStatsInitial.success,
           );
           apiOpStatsUpdated.success.should.be.equal(
             apiOpStatsInitial.success + 1,

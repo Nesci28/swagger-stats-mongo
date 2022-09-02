@@ -69,14 +69,28 @@ export class SwsAPIStats {
     return this.apidefs;
   }
 
-  public getAPIStats(): ApiStats {
-    return this.apistats;
+  public async getAPIStats(): Promise<ApiStats> {
+    const res = {};
+
+    const paths = Object.keys(this.apistats);
+    for (let i = 0; i < paths.length; i += 1) {
+      const path = paths[i];
+      res[path] = {};
+      const methods = Object.keys(this.apistats[path]);
+      for (let j = 0; j < methods.length; j += 1) {
+        const method = methods[j];
+        // eslint-disable-next-line no-await-in-loop
+        res[path][method] = await this.apistats[path][method].getStats();
+      }
+    }
+
+    return res;
   }
 
-  public getAPIOperationStats(
+  public async getAPIOperationStats(
     path: string,
     method: HTTPMethod,
-  ): APIOperationStats {
+  ): Promise<APIOperationStats> {
     if (typeof path === "undefined" || !path) return {};
     if (typeof method === "undefined" || !method) return {};
 
@@ -91,7 +105,7 @@ export class SwsAPIStats {
 
     // api op stats
     if (path in this.apistats && method in this.apistats[path]) {
-      res[path][method].stats = this.apistats[path][method];
+      res[path][method].stats = await this.apistats[path][method].getStats();
     }
 
     // api op details
@@ -129,7 +143,7 @@ export class SwsAPIStats {
     return fullPath;
   }
 
-  public initialize(swsOptions): void {
+  public async initialize(swsOptions): Promise<void> {
     if (!swsOptions) {
       return;
     }
@@ -228,7 +242,8 @@ export class SwsAPIStats {
           this.apidefs[fullPath][opMethod] = apiOpDef;
 
           // Create Stats for this API Operation; stats stored separately so only stats can be retrieved
-          this.getAPIOpStats(fullPath, opMethod);
+          // eslint-disable-next-line no-await-in-loop
+          await this.getAPIOpStats(fullPath, opMethod);
 
           // Create entry in apidetails
           this.getApiOpDetails(fullPath, opMethod);
@@ -327,16 +342,21 @@ export class SwsAPIStats {
   }
 
   // Get or create API Operation Stats
-  private getAPIOpStats(path: string, method: HTTPMethod): SwsReqResStats {
+  private async getAPIOpStats(
+    path: string,
+    method: HTTPMethod,
+  ): Promise<SwsReqResStats> {
     if (!(path in this.apistats)) {
       this.apistats[path] = {} as ApiStatsMethod;
     }
-    if (!(method in this.apistats[path]))
+    if (!(method in this.apistats[path])) {
       this.apistats[path][method] = new SwsReqResStats(
         this.options!.apdexThreshold,
         this.redis,
         `${path}${method}`,
       );
+      await this.apistats[path][method].init();
+    }
 
     return this.apistats[path][method];
   }
@@ -531,14 +551,14 @@ export class SwsAPIStats {
   }
 
   // Count request
-  public countRequest(req: SwsRequest): void {
+  public async countRequest(req: SwsRequest): Promise<void> {
     // Count request if it was matched to API Operation
     if ("match" in req.sws && req.sws.match) {
-      const apiOpStats = this.getAPIOpStats(
+      const apiOpStats = await this.getAPIOpStats(
         req.sws.api_path,
         req.method as HTTPMethod,
       );
-      apiOpStats.countRequest(req.sws.req_clength);
+      await apiOpStats.countRequest(req.sws.req_clength);
       this.countParametersStats(
         req.sws.api_path,
         req.method as HTTPMethod,
@@ -553,7 +573,7 @@ export class SwsAPIStats {
     const codeclass = SwsUtil.getStatusCodeClass(res.statusCode);
 
     // Only intersted in updating stats here
-    const apiOpStats = this.getAPIOpStats(req.sws.api_path, req.method);
+    const apiOpStats = await this.getAPIOpStats(req.sws.api_path, req.method);
 
     // If request was not matched to API operation,
     // do both count request and count response here,
@@ -561,7 +581,7 @@ export class SwsAPIStats {
     // This allows supporting API statistics on non-swagger express route APIs, like /path/:param
     // as express router would attach route.path to request
     if (!("match" in req.sws) || !req.sws.match) {
-      apiOpStats.countRequest(req.sws.req_clength);
+      await apiOpStats.countRequest(req.sws.req_clength);
     }
 
     // In all cases, count response here

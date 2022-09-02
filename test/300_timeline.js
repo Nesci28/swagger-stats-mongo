@@ -30,7 +30,7 @@ if (process.env.SWS_TIMELINE_TEST_DURATION) {
 
 const expectedTimelineValues = {};
 
-function sendTestRequestsOnce(iteration, deferred) {
+async function sendTestRequestsOnce(iteration, deferred) {
   if (iteration <= 0) {
     setTimeout(deferred.resolve, 1100); // Make sure time interval finished before we get stats
     return;
@@ -42,6 +42,7 @@ function sendTestRequestsOnce(iteration, deferred) {
   debug("Iter(%d): starting at %s (%s) ", iteration, ts, ts % 1000);
   const timelineid = Math.floor(ts / timelineBucketDuration);
   expectedTimelineValues[timelineid] = new SwsReqResStats();
+  await expectedTimelineValues[timelineid].init();
   const timelineCurrent = expectedTimelineValues[timelineid];
 
   // Generate random number of requests each iteration

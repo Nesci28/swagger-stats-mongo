@@ -11,98 +11,120 @@ import { SwsUtil } from "./swsUtil";
 // Request / Response statistics
 // apdex_threshold: Thresold for apdex calculation, in milliseconds 50 (ms) by default
 export class SwsReqResStats {
-  private requests = 0; // Total number of requests received
-
-  private responses = 0; // Total number of responses sent
-
-  private errors = 0; // Total number of error responses
-
-  private info = 0; // Total number of informational responses
-
-  private success = 0; // Total number of success responses
-
-  private redirect = 0; // Total number of redirection responses
-
-  private client_error = 0; // Total number of client error responses
-
-  private server_error = 0; // Total number of server error responses
-
-  private total_time = 0; // Sum of total processing time (from request received to response finished)
-
-  private max_time = 0; // Maximum observed processed time
-
-  private avg_time = 0; // Average processing time
-
-  private total_req_clength = 0; // Total (Sum) of Content Lengths of received requests
-
-  private max_req_clength = 0; // Maximum observed Content length in received requests
-
-  private avg_req_clength = 0; // Average Content Length in received requests
-
-  private total_res_clength = 0; // Total (Sum) of Content Lengths of sent responses
-
-  private max_res_clength = 0; // Maximum observed Content Length in sent responses
-
-  private avg_res_clength = 0; // Average Content Length in sent responses
-
-  private req_rate = 0; // Request Rate
-
-  private err_rate = 0; // Error Rate
-
-  private apdex_threshold = Number.isNaN(this.apdexThreshold)
-    ? this.apdexThreshold
-    : 50; // Apdex threshold
-
-  private apdex_satisfied = 0; // Total number of "satisfied" responses for Apdex: time <= apdex_threshold
-
-  private apdex_tolerated = 0; // Total number of "tolerated" responses for Apdex: time <= (apdex_threshold*4)
-
-  private apdex_score = 0; // Apdex score: (apdex_satisfied + (apdex_tolerated/2))/responses
-
   constructor(
     private readonly apdexThreshold: number | undefined,
     private readonly redis: Redis,
     private readonly redisKey: string,
   ) {}
 
+  public async init(): Promise<void> {
+    await Promise.all([
+      this.redis.set(`${this.redisKey}-requests`, 0),
+      this.redis.set(`${this.redisKey}-total_req_clength`, 0),
+      this.redis.set(`${this.redisKey}-max_req_clength`, 0),
+      this.redis.set(`${this.redisKey}-avg_req_clength`, 0),
+      this.redis.set(`${this.redisKey}-responses`, 0),
+      this.redis.set(`${this.redisKey}-info`, 0),
+      this.redis.set(`${this.redisKey}-success`, 0),
+      this.redis.set(`${this.redisKey}-redirect`, 0),
+      this.redis.set(`${this.redisKey}-client_error`, 0),
+      this.redis.set(`${this.redisKey}-server_error`, 0),
+      this.redis.set(`${this.redisKey}-errors`, 0),
+      this.redis.set(`${this.redisKey}-total_time`, 0),
+      this.redis.set(`${this.redisKey}-avg_time`, 0),
+      this.redis.set(`${this.redisKey}-max_time`, 0),
+      this.redis.set(`${this.redisKey}-total_res_clength`, 0),
+      this.redis.set(`${this.redisKey}-max_res_clength`, 0),
+      this.redis.set(`${this.redisKey}-avg_res_clength`, 0),
+      this.redis.set(
+        `${this.redisKey}-apdex_threshold`,
+        Number.isNaN(this.apdexThreshold) ? this.apdexThreshold : 50,
+      ),
+      this.redis.set(`${this.redisKey}-apdex_satisfied`, 0),
+      this.redis.set(`${this.redisKey}-apdex_tolerated`, 0),
+      this.redis.set(`${this.redisKey}-apdex_score`, 0),
+    ]);
+  }
+
+  public async getStats(): Promise<any> {
+    const results = await Promise.all([
+      this.redis.get(`${this.redisKey}-requests`),
+      this.redis.get(`${this.redisKey}-total_req_clength`),
+      this.redis.get(`${this.redisKey}-max_req_clength`),
+      this.redis.get(`${this.redisKey}-avg_req_clength`),
+      this.redis.get(`${this.redisKey}-responses`),
+      this.redis.get(`${this.redisKey}-info`),
+      this.redis.get(`${this.redisKey}-success`),
+      this.redis.get(`${this.redisKey}-redirect`),
+      this.redis.get(`${this.redisKey}-client_error`),
+      this.redis.get(`${this.redisKey}-server_error`),
+      this.redis.get(`${this.redisKey}-errors`),
+      this.redis.get(`${this.redisKey}-total_time`),
+      this.redis.get(`${this.redisKey}-avg_time`),
+      this.redis.get(`${this.redisKey}-max_time`),
+      this.redis.get(`${this.redisKey}-total_res_clength`),
+      this.redis.get(`${this.redisKey}-max_res_clength`),
+      this.redis.get(`${this.redisKey}-avg_res_clength`),
+      this.redis.get(`${this.redisKey}-apdex_satisfied`),
+      this.redis.get(`${this.redisKey}-apdex_tolerated`),
+      this.redis.get(`${this.redisKey}-apdex_score`),
+      this.redis.get(`${this.redisKey}-req_rate`),
+      this.redis.get(`${this.redisKey}-err_rate`),
+    ]);
+
+    return {
+      requests: +results[0],
+      total_req_clength: +results[1],
+      max_req_clength: +results[2],
+      avg_req_clength: +results[3],
+      responses: +results[4],
+      info: +results[5],
+      success: +results[6],
+      redirect: +results[7],
+      client_error: +results[8],
+      server_error: +results[9],
+      errors: +results[10],
+      total_time: +results[11],
+      avg_time: +results[12],
+      max_time: +results[13],
+      total_res_clength: +results[14],
+      max_res_clength: +results[15],
+      avg_res_clength: +results[16],
+      apdex_satisfied: +results[17],
+      apdex_tolerated: +results[18],
+      apdex_score: +results[19],
+      req_rate: +results[20],
+      err_rate: +results[21],
+    };
+  }
+
   public async countRequest(clength: number): Promise<void> {
-    try {
-      const promises: Promise<"OK">[] = [];
-      this.requests += 1;
+    const promises: Promise<number | "OK">[] = [];
+    promises.push(this.redis.incr(`${this.redisKey}-requests`));
+
+    promises.push(
+      this.redis.incrby(`${this.redisKey}-total_req_clength`, clength),
+    );
+
+    const [maxReqClength, requests, totalReqClength] = await Promise.all([
+      this.redis.get(`${this.redisKey}-max_req_clength`),
+      this.redis.get(`${this.redisKey}-requests`),
+      this.redis.get(`${this.redisKey}-total_req_clength`),
+    ]);
+
+    const isMaxReqClengthSmaller = +maxReqClength < clength;
+    if (isMaxReqClengthSmaller) {
       promises.push(
-        this.redis.set(`${this.redisKey}-requests`, this.requests.toString()),
+        this.redis.set(`${this.redisKey}-max_req_clength`, clength),
       );
-
-      this.total_req_clength += clength;
-      promises.push(
-        this.redis.set(
-          `${this.redisKey}-total_req_clength`,
-          this.total_req_clength.toString(),
-        ),
-      );
-
-      if (this.max_req_clength < clength) {
-        this.max_req_clength = clength;
-        promises.push(
-          this.redis.set(
-            `${this.redisKey}-max_req_clength`,
-            this.max_req_clength.toString(),
-          ),
-        );
-      }
-
-      this.avg_req_clength = Math.floor(this.total_req_clength / this.requests);
-      promises.push(
-        this.redis.set(
-          `${this.redisKey}-avg_req_clength`,
-          this.avg_req_clength.toString(),
-        ),
-      );
-
-      await Promise.all(promises);
-    } catch (err) {
-      console.log("err :>> ", err);
     }
+
+    const avgReqClength = Math.floor(+totalReqClength / (+requests + 1));
+    promises.push(
+      this.redis.set(`${this.redisKey}-avg_req_clength`, avgReqClength),
+    );
+
+    await Promise.all(promises);
   }
 
   public async countResponse(
@@ -111,120 +133,97 @@ export class SwsReqResStats {
     duration: number,
     clength: number,
   ): Promise<void> {
-    try {
-      const promises: Promise<"OK">[] = [];
+    const promises: Promise<"OK" | number>[] = [];
 
-      this.responses += 1;
-      promises.push(
-        this.redis.set(`${this.redisKey}-responses`, this.responses.toString()),
-      );
+    promises.push(this.redis.incr(`${this.redisKey}-responses`));
+    promises.push(this.redis.incr(`${this.redisKey}-${codeclass}`));
 
-      this[codeclass] += 1;
-      promises.push(
-        this.redis.set(
-          `${this.redisKey}-${codeclass}`,
-          this[codeclass].toString(),
-        ),
-      );
-
-      const isError = SwsUtil.isError(code);
-      if (isError) {
-        this.errors += 1;
-        promises.push(
-          this.redis.set(`${this.redisKey}-errors`, this.errors.toString()),
-        );
-      }
-
-      this.total_time += duration;
-      promises.push(
-        this.redis.set(
-          `${this.redisKey}-total_time`,
-          this.total_time.toString(),
-        ),
-      );
-
-      this.avg_time = this.total_time / this.requests;
-      promises.push(
-        this.redis.set(`${this.redisKey}-avg_time`, this.avg_time.toString()),
-      );
-
-      if (this.max_time < duration) {
-        this.max_time = duration;
-        promises.push(
-          this.redis.set(`${this.redisKey}-max_time`, this.max_time.toString()),
-        );
-      }
-
-      this.total_res_clength += clength;
-      promises.push(
-        this.redis.set(
-          `${this.redisKey}-total_res_clength`,
-          this.total_res_clength.toString(),
-        ),
-      );
-
-      if (this.max_res_clength < clength) {
-        this.max_res_clength = clength;
-        promises.push(
-          this.redis.set(
-            `${this.redisKey}-max_res_clength`,
-            this.max_res_clength.toString(),
-          ),
-        );
-      }
-
-      this.avg_res_clength = Math.floor(
-        this.total_res_clength / this.responses,
-      );
-      promises.push(
-        this.redis.set(
-          `${this.redisKey}-avg_res_clength`,
-          this.avg_res_clength.toString(),
-        ),
-      );
-
-      // Apdex: https://en.wikipedia.org/wiki/Apdex
-      if (codeclass === "success" || codeclass === "redirect") {
-        if (duration <= this.apdex_threshold) {
-          this.apdex_satisfied += 1;
-          promises.push(
-            this.redis.set(
-              `${this.redisKey}-apdex_satisfied`,
-              this.apdex_satisfied.toString(),
-            ),
-          );
-        } else if (duration <= this.apdex_threshold * 4) {
-          this.apdex_tolerated += 1;
-          promises.push(
-            this.redis.set(
-              `${this.redisKey}-apdex_tolerated`,
-              this.apdex_tolerated.toString(),
-            ),
-          );
-        }
-      }
-      this.apdex_score =
-        (this.apdex_satisfied + this.apdex_tolerated / 2) / this.responses;
-      promises.push(
-        this.redis.set(
-          `${this.redisKey}-apdex_score`,
-          this.apdex_score.toString(),
-        ),
-      );
-
-      await Promise.all(promises);
-    } catch (err) {
-      console.log("err :>> ", err);
+    const isError = SwsUtil.isError(code);
+    if (isError) {
+      promises.push(this.redis.incr(`${this.redisKey}-errors`));
     }
+
+    promises.push(this.redis.incrby(`${this.redisKey}-total_time`, duration));
+
+    const [
+      totalTime,
+      requests,
+      maxTime,
+      totalResClength,
+      maxResClength,
+      responses,
+      apdexThreshold,
+    ] = await Promise.all([
+      this.redis.get(`${this.redisKey}-total_time`),
+      this.redis.get(`${this.redisKey}-requests`),
+      this.redis.get(`${this.redisKey}-max_time`),
+      this.redis.get(`${this.redisKey}-total_res_clength`),
+      this.redis.get(`${this.redisKey}-max_res_clength`),
+      this.redis.get(`${this.redisKey}-responses`),
+      this.redis.get(`${this.redisKey}-apdex_threshold`),
+    ]);
+
+    const avgTime = +totalTime / +requests;
+    promises.push(this.redis.set(`${this.redisKey}-avg_time`, avgTime));
+
+    const isMaxTimeSmaller = +maxTime < duration;
+    if (isMaxTimeSmaller) {
+      promises.push(this.redis.set(`${this.redisKey}-max_time`, duration));
+    }
+
+    promises.push(
+      this.redis.incrby(
+        `${this.redisKey}-total_res_clength`,
+        +totalResClength + clength,
+      ),
+    );
+
+    const isMaxResClengthSmaller = +maxResClength < clength;
+    if (isMaxResClengthSmaller) {
+      promises.push(
+        this.redis.set(`${this.redisKey}-max_res_clength`, clength),
+      );
+    }
+
+    const avgResClength = Math.floor((+totalResClength + clength) / +responses);
+    promises.push(
+      this.redis.set(`${this.redisKey}-avg_res_clength`, avgResClength),
+    );
+
+    // Apdex: https://en.wikipedia.org/wiki/Apdex
+    if (codeclass === "success" || codeclass === "redirect") {
+      if (duration <= +apdexThreshold) {
+        promises.push(this.redis.incr(`${this.redisKey}-apdex_satisfied`));
+      } else if (duration <= +apdexThreshold * 4) {
+        promises.push(this.redis.incr(`${this.redisKey}-apdex_tolerated`));
+      }
+    }
+
+    const [apdexSatisfied, apdexTolerated] = await Promise.all([
+      this.redis.get(`${this.redisKey}-apdex_satisfied`),
+      this.redis.get(`${this.redisKey}-apdex_tolerated`),
+    ]);
+
+    const apdexScore = (+apdexSatisfied + +apdexTolerated / 2) / +responses;
+    promises.push(this.redis.set(`${this.redisKey}-apdex_score`, apdexScore));
+
+    await Promise.all(promises);
   }
 
   public async updateRates(elapsed: number): Promise<void> {
     // this.req_rate = Math.round( (this.requests / elapsed) * 1e2 ) / 1e2; //;
+    const [requests, errors] = await Promise.all([
+      this.redis.get(`${this.redisKey}-requests`),
+      this.redis.get(`${this.redisKey}-errors`),
+    ]);
+
     const promises: Promise<"OK">[] = [];
-    this.req_rate = this.requests / elapsed;
-    promises.push(this.redis.set(`${this.redisKey}-req_rate`, this.req_rate));
-    this.err_rate = this.errors / elapsed;
-    promises.push(this.redis.set(`${this.redisKey}-err_rate`, this.err_rate));
+    promises.push(
+      this.redis.set(`${this.redisKey}-req_rate`, +requests / elapsed),
+    );
+    promises.push(
+      this.redis.set(`${this.redisKey}-err_rate`, +errors / elapsed),
+    );
 
     await Promise.all(promises);
   }

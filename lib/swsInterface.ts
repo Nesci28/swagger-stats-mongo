@@ -20,11 +20,11 @@ import { SwsProcessor } from "./swsProcessor";
 import { SwsRedis } from "./swsRedis";
 import swsSettings from "./swsSettings";
 
-let swsMongo;
-let swsAuth;
+let swsMongo: SwsMongo;
+let swsAuth: SwsAuth;
 const debug = Debug("sws:interface");
-let swsProcessor;
-let swsRedis;
+let swsProcessor: SwsProcessor;
+let swsRedis: SwsRedis;
 
 // Request hanlder
 async function handleRequest(req: SwsRequest, res: SwsResponse): Promise<void> {
@@ -72,7 +72,8 @@ async function processGetStats(
     res.setHeader("x-sws-authenticated", "true");
   }
   res.setHeader("Content-Type", "application/json");
-  res.end(JSON.stringify(swsProcessor.getStats(req.sws.query)));
+  const stats = await swsProcessor.getStats(req.sws.query);
+  res.end(JSON.stringify(stats));
 }
 
 // Process /swagger-stats/metrics request
@@ -137,7 +138,7 @@ async function expressMiddleware(
   swsEgress.init();
 
   swsProcessor = new SwsProcessor(swsRedis.redis);
-  swsProcessor.init();
+  await swsProcessor.init();
 
   const fn = async (
     req: SwsRequest,
@@ -185,9 +186,7 @@ export = {
 
   // TODO Support specifying which stat fields to return
   // Returns object with collected statistics
-  getCoreStats(): {
-    startts: number;
-  } {
+  async getCoreStats(): Promise<{ startts: number }> {
     return swsProcessor.getStats();
   },
 

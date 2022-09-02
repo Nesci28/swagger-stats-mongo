@@ -34,10 +34,11 @@ function sendTestRequestsOnce(iteration, deferred) {
   // Generate random number of requests each iteration
   let reqcntr = 0;
 
-  methods.forEach((method) => {
+  methods.forEach(async (method) => {
     if (!(method in expectedMethodValues)) {
       expectedMethodValues[method] = new SwsReqResStats();
     }
+    await expectedMethodValues[method].init();
     const methodCurrent = expectedMethodValues[method];
 
     const numReq = swsTestUtils.getRandomArbitrary(0, 5);
