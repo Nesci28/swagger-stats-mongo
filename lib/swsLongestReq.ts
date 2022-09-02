@@ -5,9 +5,7 @@
  * Requests with longest observed handle time, since star
  */
 
-interface LongestRequest {
-  responsetime: number;
-}
+import { RequestResponseRecord } from "./interfaces/request-response-record.interface";
 
 export class SwsLongestRequests {
   // Highest duration from all stored requests
@@ -24,13 +22,13 @@ export class SwsLongestRequests {
   private full = false;
 
   // Store 100 longest requests
-  private longest_requests: LongestRequest[] = [];
+  private longest_requests: RequestResponseRecord[] = [];
 
-  public getStats(): LongestRequest[] {
+  public getStats(): RequestResponseRecord[] {
     return this.longest_requests;
   }
 
-  private placeReqResData(rrr: LongestRequest): void {
+  private placeReqResData(rrr: RequestResponseRecord): void {
     const duration = rrr.responsetime;
 
     if (duration >= this.highest) {
@@ -61,7 +59,7 @@ export class SwsLongestRequests {
   }
 
   // Check if this qualifies as longest request, and store is yes
-  public processReqResData(rrr: LongestRequest): void {
+  public processReqResData(rrr: RequestResponseRecord): void {
     const duration = rrr.responsetime;
 
     if (!this.full) {

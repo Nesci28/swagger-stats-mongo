@@ -6,41 +6,38 @@ import monk, {
   InsertResult,
 } from "monk";
 
+import { SwsOptions } from "./interfaces/options.interface";
 import { Session } from "./interfaces/session.interface";
 
 export class SwsMongo {
-  private MONGO_URL: string;
+  private mongoUrl: string;
 
-  private MONGO_USERNAME: string;
+  private mongoUsername: string;
 
-  private MONGO_PASSWORD: string;
+  private mongoPasswords: string;
 
-  private SWAGGER_STATS_MONGO_DB: string;
+  private swaggerStatsMongoDb: string;
 
   private sessionsDb: ICollection<Session>;
 
   private swaggerStatsDb: ICollection<any>;
 
-  constructor(options) {
-    const {
-      MONGO_URL,
-      MONGO_USERNAME,
-      MONGO_PASSWORD,
-      SWAGGER_STATS_MONGO_DB,
-    } = options;
-    if (!MONGO_URL || !SWAGGER_STATS_MONGO_DB) {
+  constructor(options: SwsOptions) {
+    const { mongoUrl, mongoUsername, mongoPassword, swaggerStatsMongoDb } =
+      options;
+    if (!mongoUrl || !swaggerStatsMongoDb) {
       throw new Error("Missing Swagger-Stats variables");
     }
-    this.MONGO_URL = MONGO_URL;
-    this.MONGO_USERNAME = MONGO_USERNAME;
-    this.MONGO_PASSWORD = MONGO_PASSWORD;
-    this.SWAGGER_STATS_MONGO_DB = SWAGGER_STATS_MONGO_DB;
+    this.mongoUrl = mongoUrl;
+    this.mongoUsername = mongoUsername;
+    this.mongoPasswords = mongoPassword;
+    this.swaggerStatsMongoDb = swaggerStatsMongoDb;
   }
 
   public async init(): Promise<void> {
-    const uri = this.MONGO_USERNAME
-      ? `mongodb://${this.MONGO_USERNAME}:${this.MONGO_PASSWORD}@${this.MONGO_URL}/${this.SWAGGER_STATS_MONGO_DB}`
-      : `mongodb://${this.MONGO_URL}/${this.SWAGGER_STATS_MONGO_DB}`;
+    const uri = this.mongoUsername
+      ? `mongodb://${this.mongoUsername}:${this.mongoPasswords}@${this.mongoUrl}/${this.swaggerStatsMongoDb}`
+      : `mongodb://${this.mongoUrl}/${this.swaggerStatsMongoDb}`;
 
     const db = monk(uri);
     this.sessionsDb = db.get<Session>("sessions");

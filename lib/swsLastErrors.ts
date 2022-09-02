@@ -4,6 +4,7 @@
  * Last Errors
  */
 
+import { RequestResponseRecord } from "./interfaces/request-response-record.interface";
 import { SwsUtil } from "./swsUtil";
 
 export class SwsLastErrors {
@@ -14,7 +15,7 @@ export class SwsLastErrors {
   }
 
   // Add information about last error
-  public addError(rrr): void {
+  public addError(rrr: RequestResponseRecord): void {
     this.last_errors.push(rrr);
     // Clean up if more than allowed
     if (this.last_errors.length > 100) {
@@ -23,8 +24,8 @@ export class SwsLastErrors {
   }
 
   // Check if this qualifies as longest request, and store is yes
-  public processReqResData(rrr): void {
-    if (SwsUtil.isError(rrr.http.response.code)) {
+  public processReqResData(rrr: RequestResponseRecord): void {
+    if (SwsUtil.isError(+rrr.http.response.code)) {
       this.addError(rrr);
     }
   }

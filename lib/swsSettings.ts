@@ -3,6 +3,8 @@
 
 import * as os from "os";
 
+import { SwsOptions } from "./interfaces/options.interface";
+
 /* swagger=stats settings */
 class SwsSettings {
   // Hostname. Will attempt to detect if not explicitly provided
@@ -140,7 +142,7 @@ class SwsSettings {
 
   public pathLogout = "/swagger-stats/logout";
 
-  public init(options): void {
+  public init(options: SwsOptions): void {
     if (typeof options === "undefined" || !options) {
       return;
     }

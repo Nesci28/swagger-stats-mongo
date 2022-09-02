@@ -370,7 +370,6 @@ export class SwsAPIStats {
 
   // Try to match request to API to known API definition
   public matchRequest(req: SwsRequest): void {
-    console.log("mating");
     let url = req.sws.originalUrl;
     // Handle "/pets" and "/pets/" the same way - #105
     if (url.endsWith("/")) {
@@ -390,36 +389,33 @@ export class SwsAPIStats {
     let apiPathParams;
     let apiInfo;
 
-    console.log("url :>> ", url);
-    console.log("this.apiMatchIndex :>> ", this.apiMatchIndex);
-
     // First check if we can find exact match in apiMatchIndex
     if (url in this.apiMatchIndex) {
       matchEntry = this.apiMatchIndex[url];
       apiPath = url;
-      console.log("apiPath :>> ", apiPath);
       this.debug("SWS:MATCH: %s exact match", url);
     } else {
       // if not, search by regex matching
       // eslint-disable-next-line no-restricted-syntax
       for (const swPath of Object.keys(this.apiMatchIndex)) {
-        if (this.apiMatchIndex[swPath].re !== null) {
-          const matchResult = this.apiMatchIndex[swPath].re.exec(url);
-          if (matchResult && matchResult instanceof Array) {
-            matchEntry = this.apiMatchIndex[swPath];
-            apiPath = swPath;
-            apiPathParams = this.extractPathParams(
-              matchResult,
-              this.apiMatchIndex[swPath].keys,
-            );
-            this.debug("SWS:MATCH: %s matched to %s", url, swPath);
-            break; // Done
-          }
+        if (!this.apiMatchIndex[swPath].re) {
+          // eslint-disable-next-line no-continue
+          continue;
+        }
+
+        const matchResult = this.apiMatchIndex[swPath].re.exec(url);
+        if (matchResult && matchResult instanceof Array) {
+          matchEntry = this.apiMatchIndex[swPath];
+          apiPath = swPath;
+          apiPathParams = this.extractPathParams(
+            matchResult,
+            this.apiMatchIndex[swPath].keys,
+          );
+          this.debug("SWS:MATCH: %s matched to %s", url, swPath);
+          break; // Done
         }
       }
     }
-
-    console.log("2");
 
     if (matchEntry) {
       if (req.method in matchEntry.methods) {

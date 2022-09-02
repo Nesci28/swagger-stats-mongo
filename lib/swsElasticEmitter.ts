@@ -6,6 +6,7 @@ import Debug from "debug";
 import moment from "moment";
 import request from "request";
 
+import { RequestResponseRecord } from "./interfaces/request-response-record.interface";
 import { SwsUtil } from "./swsUtil";
 
 const indexTemplate = require("../schema/elasticsearch/api_index_template.json");
@@ -200,7 +201,7 @@ export class SwsElasticEmitter {
   }
 
   // Pre-process RRR
-  private preProcessRecord(rrr): void {
+  private preProcessRecord(rrr: RequestResponseRecord): void {
     // handle custom attributes
     if ("attrs" in rrr) {
       const { attrs } = rrr;
@@ -220,7 +221,7 @@ export class SwsElasticEmitter {
   }
 
   // Index Request Response Record
-  public processRecord(rrr): void {
+  public processRecord(rrr: RequestResponseRecord): void {
     if (!this.enabled) {
       return;
     }

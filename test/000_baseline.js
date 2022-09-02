@@ -59,6 +59,7 @@ setImmediate(() => {
       }).timeout(3000);
 
       it("should collect initial statistics values", (done) => {
+        console.log("api :>> ", api);
         api
           .get(swsTestFixture.SWS_TEST_STATS_API)
           .query({ fields: "method" })

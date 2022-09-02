@@ -7,6 +7,7 @@
 import moment from "moment";
 
 import { SwsRequest } from "./interfaces/request.interface";
+import { RequestResponseRecord } from "./interfaces/request-response-record.interface";
 import { SwsResponse } from "./interfaces/response.interface";
 import { SwsAPIStats } from "./swsAPIStats";
 import { SwsCoreStats } from "./swsCoreStats";
@@ -18,31 +19,6 @@ import swsSettings from "./swsSettings";
 import { SwsSysStats } from "./swsSysStats";
 import { SwsTimeline } from "./swsTimeline";
 import { SwsUtil } from "./swsUtil";
-
-interface RequestResponseData {
-  path: any;
-  method: any;
-  query: string;
-  startts: number;
-  endts: number;
-  responsetime: number;
-  node: {
-    name: string;
-    version: string;
-    hostname: any;
-    ip: any;
-  };
-  http: {
-    request: {
-      url: any;
-    };
-    response: {
-      code: number;
-      class: string;
-      phrase: string;
-    };
-  };
-}
 
 // swagger-stats Processor. Processes requests / responses and maintains metrics
 class SwsProcessor {
@@ -152,12 +128,12 @@ class SwsProcessor {
 
   // Collect all data for request/response pair
   // TODO Support option to add arbitrary extra properties to sws request/response record
-  private collectRequestResponseData(res: SwsResponse): RequestResponseData {
+  private collectRequestResponseData(res: SwsResponse): RequestResponseRecord {
     const req = res._swsReq;
 
     const codeclass = SwsUtil.getStatusCodeClass(res.statusCode);
 
-    const rrr: any = {
+    const rrr: Partial<RequestResponseRecord> = {
       path: req.sws.originalUrl,
       method: req.method,
       query: `${req.method} ${req.sws.originalUrl}`,
@@ -175,7 +151,7 @@ class SwsProcessor {
           url: req.url,
         },
         response: {
-          code: res.statusCode,
+          code: res.statusCode.toString(),
           class: codeclass,
           phrase: res.statusMessage,
         },
@@ -215,7 +191,7 @@ class SwsProcessor {
       rrr.http.request.route_path = req.sws.route_path;
 
       // Add detailed swagger API info
-      rrr.api = {};
+      rrr.api = {} as RequestResponseRecord["api"];
       rrr.api.path = req.sws.api_path;
       rrr.api.query = `${req.method} ${req.sws.api_path}`;
       if ("swagger" in req.sws) rrr.api.swagger = req.sws.swagger;
@@ -230,7 +206,7 @@ class SwsProcessor {
         req,
       );
       if (apiParams !== null) {
-        rrr.api.params = apiParams;
+        rrr.api.params = apiParams as any;
       }
 
       // TODO Support Arbitrary extra properties added to request under sws
@@ -253,7 +229,7 @@ class SwsProcessor {
       // SwsUtil.swsStringRecursive(rrr.http.request.body, req.body);
     }
 
-    return rrr;
+    return rrr as RequestResponseRecord;
   }
 
   private getRemoteIP(req: SwsRequest): string {
@@ -316,7 +292,6 @@ class SwsProcessor {
   }
 
   public processRequest(req: SwsRequest): void {
-    console.log("processing");
     // Placeholder for sws-specific attributes
     req.sws = req.sws || {};
 
@@ -344,8 +319,6 @@ class SwsProcessor {
     this.apiStats.matchRequest(req);
 
     // if no match, and tracking of non-swagger requests is disabled, return
-    console.log("req.sws.match :>> ", req.sws.match);
-    console.log("this.swaggerOnly :>> ", this.swaggerOnly);
     if (!req.sws.match && this.swaggerOnly) {
       req.sws.track = false;
       return;

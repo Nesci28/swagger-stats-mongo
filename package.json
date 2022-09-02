@@ -1,10 +1,11 @@
 {
-    "name": "swagger-stats",
-    "version": "0.99.2",
+    "name": "@nesci28/ts-swagger-stats-redis",
+    "version": "0.0.1-beta.1",
     "description": "API Telemetry and APM. Trace API calls and Monitor API performance, health and usage statistics in Node.js Microservices, based on express routes and Swagger (Open API) specification",
-    "main": "lib/index.js",
+    "main": "dist/index.js",
     "scripts": {
-        "build": "npm run copy:ux && tsc -p tsconfig.build.json",
+        "prepublish": "npm run build",
+        "build": "rm -rf ./dist && npm run copy:ux && tsc -p tsconfig.build.json",
         "copy:ux": "ncp node_modules/swagger-stats-ux/dist ux",
         "start": "node example/app.js",
         "hapitestapp": "cross-env SWS_AUTHTEST_MAXAGE=2 nyc  node examples/hapijstest/hapijstest.js",
@@ -83,11 +84,11 @@
         "README.md",
         "CHANGELOG.md",
         "CONTRIBUTING.md",
-        "LICENSE"
+        "LICENSE",
+        "dist/*"
     ],
-    "repository": {
-        "type": "git",
-        "url": "https://github.com/slanatech/swagger-stats"
+    "publishConfig": {
+        "registry": "https://nexus.nos.sh/repository/npm/"
     },
     "author": "https://github.com/sv2",
     "homepage": "http://swaggerstats.io",

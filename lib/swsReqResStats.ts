@@ -61,7 +61,6 @@ export class SwsReqResStats {
 
   public countRequest(clength: number): void {
     this.requests += 1;
-    console.log("this.requests :>> ", this.requests);
     this.total_req_clength += clength;
     if (this.max_req_clength < clength) this.max_req_clength = clength;
     this.avg_req_clength = Math.floor(this.total_req_clength / this.requests);

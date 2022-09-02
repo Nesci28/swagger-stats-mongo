@@ -8,7 +8,7 @@ const http = require("http");
 
 // We will use it to store expected values
 const debug = require("debug")("swstest:baseline");
-const SwsReqResStats = require("../dist/swsReqResStats.js");
+const { SwsReqResStats } = require("../dist/swsReqResStats.js");
 const { SwsUtil } = require("../dist/swsUtil.js");
 
 const swsTestFixture = require("./testfixture.js");
@@ -132,8 +132,6 @@ function generateTestRequests() {
 
 setImmediate(() => {
   describe("Timeline statistics test", () => {
-    this.timeout(120000);
-
     describe("Initialize", () => {
       it("should initialize example app", (done) => {
         supertest(swsTestFixture.SWS_TEST_DEFAULT_URL)
@@ -184,7 +182,7 @@ setImmediate(() => {
           debug("generateRandomRequests - finished!");
           done();
         });
-      });
+      }).timeout(6000);
     });
 
     // Get API Stats, and check that number of requests / responses is correctly calculated

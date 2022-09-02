@@ -10,6 +10,7 @@ import qs from "qs";
 import send from "send";
 import url from "url";
 
+import { SwsOptions } from "./interfaces/options.interface";
 import { SwsRequest } from "./interfaces/request.interface";
 import { SwsResponse } from "./interfaces/response.interface";
 import { SwsAuth } from "./swsAuth";
@@ -24,7 +25,6 @@ const debug = Debug("sws:interface");
 
 // Request hanlder
 function handleRequest(req: SwsRequest, res: SwsResponse): void {
-  console.log("handling");
   try {
     swsProcessor.processRequest(req);
   } catch (e) {
@@ -113,7 +113,7 @@ function processGetUX(req: SwsRequest, res: SwsResponse): void {
 
 // Express Middleware
 async function expressMiddleware(
-  options,
+  options: SwsOptions,
 ): Promise<
   (req: SwsRequest, res: SwsResponse, next: NextFunction) => Promise<void>
 > {

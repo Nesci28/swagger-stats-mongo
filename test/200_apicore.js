@@ -258,7 +258,6 @@ parser.validate(swaggerSpecUrl, (err, api) => {
               xswsResHdr,
             );
             // Use raw node http to send test request, so we can send correctly requests to uri like /#Create ...
-            console.log("opCallDef.uri :>> ", opCallDef.uri);
             const options = {
               hostname: swsTestFixture.SWS_TEST_DEFAULT_HOST, // 'localhost'
               port: swsTestFixture.SWS_TEST_SPECTEST_PORT, // 3040,
@@ -312,11 +311,6 @@ parser.validate(swaggerSpecUrl, (err, api) => {
 
         // Check statistics values
         it(`should have correct statistics values for ${apiop.label}`, (done) => {
-          console.log("apiop.label :>> ", apiop.label);
-          console.log(
-            " apiOpStatsUpdated.requests :>> ",
-            apiOpStatsUpdated.requests,
-          );
           apiOpStatsUpdated.requests.should.be.equal(
             apiOpStatsInitial.requests + 4,
           );
