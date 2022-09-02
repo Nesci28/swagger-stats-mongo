@@ -16,17 +16,20 @@ import { SwsResponse } from "./interfaces/response.interface";
 import { SwsAuth } from "./swsAuth";
 import { swsEgress } from "./swsEgress";
 import { SwsMongo } from "./swsMongo";
-import swsProcessor from "./swsProcessor";
+import { SwsProcessor } from "./swsProcessor";
+import { SwsRedis } from "./swsRedis";
 import swsSettings from "./swsSettings";
 
 let swsMongo;
 let swsAuth;
 const debug = Debug("sws:interface");
+let swsProcessor;
+let swsRedis;
 
 // Request hanlder
-function handleRequest(req: SwsRequest, res: SwsResponse): void {
+async function handleRequest(req: SwsRequest, res: SwsResponse): Promise<void> {
   try {
-    swsProcessor.processRequest(req);
+    await swsProcessor.processRequest(req);
   } catch (e) {
     debug(`SWS:processRequest:ERROR: ${e}`);
     return;
@@ -124,12 +127,16 @@ async function expressMiddleware(
   swsMongo = new SwsMongo(options);
   await swsMongo.init();
 
+  // Init Redis
+  swsRedis = new SwsRedis(options);
+
   // Init Auth
   swsAuth = new SwsAuth(swsMongo);
 
   // Init probes
   swsEgress.init();
 
+  swsProcessor = new SwsProcessor(swsRedis.redis);
   swsProcessor.init();
 
   const fn = async (
@@ -162,7 +169,7 @@ async function expressMiddleware(
         return processGetUX(req, res);
       }
 
-      handleRequest(req, res);
+      await handleRequest(req, res);
 
       return next();
     } catch (err) {

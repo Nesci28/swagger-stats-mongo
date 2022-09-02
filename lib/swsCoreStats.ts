@@ -3,9 +3,11 @@
  * Created by sv2 on 2/18/17.
  * API usage statistics data
  */
+import Redis from "ioredis";
 import promClient from "prom-client";
 
 import { CoreMethods } from "./interfaces/core-methods.interface";
+import { HTTPMethod } from "./interfaces/http-method.interface";
 import { SwsRequest } from "./interfaces/request.interface";
 import { SwsResponse } from "./interfaces/response.interface";
 import swsMetrics from "./swsMetrics";
@@ -16,7 +18,7 @@ import { SwsUtil } from "./swsUtil";
 /* swagger=stats Prometheus metrics */
 export class SwsCoreStats {
   // Statistics for all requests
-  private all = new SwsReqResStats(swsSettings.apdexThreshold);
+  private all: SwsReqResStats;
 
   // Statistics for requests by method
   // Initialized with most frequent ones, other methods will be added on demand if actually used
@@ -35,20 +37,42 @@ export class SwsCoreStats {
     // | promClient.Histogram<string>;
   } = {};
 
+  constructor(private readonly redis: Redis) {}
+
   // Initialize
   public initialize(metricsRolePrefix?: string): void {
     this.metricsRolePrefix = metricsRolePrefix || "";
 
     // Statistics for all requests
-    this.all = new SwsReqResStats(swsSettings.apdexThreshold);
+    this.all = new SwsReqResStats(
+      swsSettings.apdexThreshold,
+      this.redis,
+      "all",
+    );
 
     // Statistics for requests by method
     // Initialized with most frequent ones, other methods will be added on demand if actually used
     this.method = {
-      GET: new SwsReqResStats(swsSettings.apdexThreshold),
-      POST: new SwsReqResStats(swsSettings.apdexThreshold),
-      PUT: new SwsReqResStats(swsSettings.apdexThreshold),
-      DELETE: new SwsReqResStats(swsSettings.apdexThreshold),
+      GET: new SwsReqResStats(
+        swsSettings.apdexThreshold,
+        this.redis,
+        HTTPMethod.GET,
+      ),
+      POST: new SwsReqResStats(
+        swsSettings.apdexThreshold,
+        this.redis,
+        HTTPMethod.POST,
+      ),
+      PUT: new SwsReqResStats(
+        swsSettings.apdexThreshold,
+        this.redis,
+        HTTPMethod.PUT,
+      ),
+      DELETE: new SwsReqResStats(
+        swsSettings.apdexThreshold,
+        this.redis,
+        HTTPMethod.DELETE,
+      ),
     };
 
     // metrics
@@ -87,7 +111,11 @@ export class SwsCoreStats {
     // Count by method
     const { method } = req;
     if (!(method in this.method)) {
-      this.method[method] = new SwsReqResStats(swsSettings.apdexThreshold);
+      this.method[method] = new SwsReqResStats(
+        swsSettings.apdexThreshold,
+        this.redis,
+        method,
+      );
     }
     this.method[method].countRequest(req.sws.req_clength);
 
@@ -107,7 +135,7 @@ export class SwsCoreStats {
     }, 250000);
   }
 
-  public countResponse(res: SwsResponse): void {
+  public async countResponse(res: SwsResponse): Promise<void> {
     const req = res._swsReq;
 
     // Defaults
@@ -120,7 +148,7 @@ export class SwsCoreStats {
     const codeclass = SwsUtil.getStatusCodeClass(res.statusCode);
 
     // update counts for all requests
-    this.all.countResponse(
+    await this.all.countResponse(
       res.statusCode,
       codeclass,
       duration,
@@ -131,7 +159,7 @@ export class SwsCoreStats {
     const { method } = req;
     if (method in this.method) {
       const mstat = this.method[method];
-      mstat.countResponse(
+      await mstat.countResponse(
         res.statusCode,
         codeclass,
         duration,

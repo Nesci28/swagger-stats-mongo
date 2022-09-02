@@ -4,6 +4,7 @@
  * API Statistics
  */
 import Debug from "debug";
+import Redis from "ioredis";
 import { Key, pathToRegexp } from "path-to-regexp";
 import promClient from "prom-client";
 
@@ -61,6 +62,8 @@ export class SwsAPIStats {
   ];
 
   private promClientMetrics: AllMetrics = {};
+
+  constructor(private readonly redis: Redis) {}
 
   public getAPIDefs(): ApiDefs {
     return this.apidefs;
@@ -331,6 +334,8 @@ export class SwsAPIStats {
     if (!(method in this.apistats[path]))
       this.apistats[path][method] = new SwsReqResStats(
         this.options!.apdexThreshold,
+        this.redis,
+        `${path}${method}`,
       );
 
     return this.apistats[path][method];
@@ -543,7 +548,7 @@ export class SwsAPIStats {
   }
 
   // Count finished response
-  public countResponse(res: SwsResponse): void {
+  public async countResponse(res: SwsResponse): Promise<void> {
     const req = res._swsReq;
     const codeclass = SwsUtil.getStatusCodeClass(res.statusCode);
 
@@ -560,7 +565,7 @@ export class SwsAPIStats {
     }
 
     // In all cases, count response here
-    apiOpStats.countResponse(
+    await apiOpStats.countResponse(
       res.statusCode,
       codeclass,
       req.sws.duration,

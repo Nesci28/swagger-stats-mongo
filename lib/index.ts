@@ -1,3 +1,3 @@
 import swsInterface from "./swsInterface.js";
 
-export = swsInterface;
+export { swsInterface };

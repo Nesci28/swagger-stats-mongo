@@ -178,7 +178,7 @@ setImmediate(() => {
           debug("generateRandomRequests - finished!");
           done();
         });
-      }).timeout(10000);
+      }).timeout(12000);
     });
 
     // Get API Stats, and check that number of requests / responses is correctly calculated

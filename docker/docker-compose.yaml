@@ -58,5 +58,13 @@ services:
       - xpack.security.enabled=false
       - discovery.type=single-node
 
+  swagger-stats-redis:
+    image: redis:latest
+    container_name: swagger-stats-redis
+    networks:
+      - swagger-stats
+    ports:
+      - 6379:6379
+
 networks:
   swagger-stats:

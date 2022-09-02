@@ -10,7 +10,7 @@ const { MongoMemoryServer } = require("mongodb-memory-server");
 // Express and middlewares
 const express = require("express");
 const expressBodyParser = require("body-parser");
-const swStats = require("../../dist/index.js"); // require('swagger-stats');
+const { swsInterface } = require("../../dist/index.js"); // require('swagger-stats');
 
 const { collectDefaultMetrics } = promClient;
 // Probe every 1 second
@@ -61,71 +61,77 @@ const swaggerSpec = require(specLocation);
 const parser = new SwaggerParser();
 
 parser.validate(swaggerSpec, async (err) => {
-  if (!err) {
-    debug("Success validating swagger file!");
+  try {
+    if (!err) {
+      debug("Success validating swagger file!");
 
-    await MongoMemoryServer.create({
-      instance: {
-        port: 27027,
-        dbName: "swagger-stats",
-      },
-    });
-
-    app.use(
-      await swStats.getMiddleware({
-        name: "swagger-stats-authtest",
-        version: "0.99.2",
-        hostname: "hostname",
-        ip: "127.0.0.1",
-        swaggerSpec,
-        swaggerOnly: true,
-        uriPath: "/swagger-stats",
-        durationBuckets: [10, 25, 50, 100, 200],
-        requestSizeBuckets: [10, 25, 50, 100, 200],
-        responseSizeBuckets: [10, 25, 50, 100, 200],
-        apdexThreshold: 100,
-        MONGO_URL: "127.0.0.1:27027",
-        SWAGGER_STATS_MONGO_DB: "swagger-stats",
-        onResponseFinish(req, res, rrr) {
-          debug("onResponseFinish: %s", JSON.stringify(rrr));
+      await MongoMemoryServer.create({
+        instance: {
+          port: 27027,
+          dbName: "swagger-stats",
         },
-        authentication: true,
-        sessionMaxAge: maxAge,
-        onAuthenticate(req, username, password) {
-          // simple check for username and password
-          if (username === "swagger-stats") {
-            const isAuth =
-              username === "swagger-stats" && password === "swagger-stats";
-            return isAuth;
-          }
-          if (username === "swagger-promise") {
-            return new Promise((resolve) => {
-              setTimeout(() => {
-                resolve(
-                  username === "swagger-promise" &&
-                    password === "swagger-promise",
-                );
-              }, 1000);
-            });
-          }
+      });
 
-          return false;
-        },
-      }),
+      app.use(
+        await swsInterface.getMiddleware({
+          name: "swagger-stats-authtest",
+          version: "0.99.2",
+          hostname: "hostname",
+          ip: "127.0.0.1",
+          swaggerSpec,
+          swaggerOnly: true,
+          uriPath: "/swagger-stats",
+          durationBuckets: [10, 25, 50, 100, 200],
+          requestSizeBuckets: [10, 25, 50, 100, 200],
+          responseSizeBuckets: [10, 25, 50, 100, 200],
+          apdexThreshold: 100,
+          mongoUrl: "127.0.0.1:27027",
+          swaggerStatsMongoDb: "swagger-stats",
+          redisHost: "swagger-stats-redis",
+          redisPort: 6379,
+          onResponseFinish(req, res, rrr) {
+            debug("onResponseFinish: %s", JSON.stringify(rrr));
+          },
+          authentication: true,
+          sessionMaxAge: maxAge,
+          onAuthenticate(req, username, password) {
+            // simple check for username and password
+            if (username === "swagger-stats") {
+              const isAuth =
+                username === "swagger-stats" && password === "swagger-stats";
+              return isAuth;
+            }
+            if (username === "swagger-promise") {
+              return new Promise((resolve) => {
+                setTimeout(() => {
+                  resolve(
+                    username === "swagger-promise" &&
+                      password === "swagger-promise",
+                  );
+                }, 1000);
+              });
+            }
+
+            return false;
+          },
+        }),
+      );
+    }
+
+    // Implement mock API
+    app.use(mockApiImplementation);
+
+    // Setup server
+    server = http.createServer(app);
+    server.listen(app.get("port"));
+    debug(
+      `Server started on port ${app.get("port")} http://localhost:${app.get(
+        "port",
+      )}`,
     );
+  } catch (error) {
+    console.log("error :>> ", error);
   }
-
-  // Implement mock API
-  app.use(mockApiImplementation);
-
-  // Setup server
-  server = http.createServer(app);
-  server.listen(app.get("port"));
-  debug(
-    `Server started on port ${app.get("port")} http://localhost:${app.get(
-      "port",
-    )}`,
-  );
 });
 
 // Mock implementation of any API request

@@ -3,6 +3,10 @@ import { IncomingMessage, ServerResponse } from "http";
 import { RequestResponseRecord } from "./request-response-record.interface";
 
 export interface SwsOptions {
+  redisHost: string;
+
+  redisPort: number;
+
   mongoUrl: string;
 
   mongoUsername: string;

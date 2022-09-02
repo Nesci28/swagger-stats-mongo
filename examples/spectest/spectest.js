@@ -19,7 +19,7 @@ const expressBodyParser = require("body-parser");
 
 const SwaggerParser = require("swagger-parser");
 
-const swStats = require("../../dist/index.js"); // require('swagger-stats');
+const { swsInterface } = require("../../dist/index.js"); // require('swagger-stats');
 
 // eslint-disable-next-line no-multi-assign
 const app = (module.exports = express());
@@ -84,8 +84,10 @@ parser.validate(specLocation, async (err, api) => {
       requestSizeBuckets: [10, 25, 50, 100, 200],
       responseSizeBuckets: [10, 25, 50, 100, 200],
       apdexThreshold: 25,
-      MONGO_URL: "127.0.0.1:27027",
-      SWAGGER_STATS_MONGO_DB: "swagger-stats",
+      mongoUrl: "127.0.0.1:27027",
+      swaggerStatsMongoDb: "swagger-stats",
+      redisHost: "swagger-stats-redis",
+      redisPort: 6379,
       onResponseFinish(req, res, rrr) {
         // You can remove non-needed or private attributes from Request Response Record
         // eslint-disable-next-line no-param-reassign
@@ -128,7 +130,7 @@ parser.validate(specLocation, async (err, api) => {
     }
 
     // Enable swagger-stats middleware with options
-    app.use(await swStats.getMiddleware(swsOptions));
+    app.use(await swsInterface.getMiddleware(swsOptions));
 
     // Implement mock API
     app.use(mockApiImplementation);

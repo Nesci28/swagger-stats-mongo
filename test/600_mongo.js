@@ -21,8 +21,8 @@ setImmediate(() => {
         });
 
         swsMongo = new SwsMongo({
-          MONGO_URL: "127.0.0.1:27027",
-          SWAGGER_STATS_MONGO_DB: "swagger-stats",
+          mongoUrl: "127.0.0.1:27027",
+          swaggerStatsMongoDb: "swagger-stats",
         });
 
         await swsMongo.init();

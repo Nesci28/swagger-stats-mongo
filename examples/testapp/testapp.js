@@ -10,7 +10,7 @@ const expressBodyParser = require("body-parser");
 
 const SwaggerParser = require("swagger-parser");
 
-const swStats = require("../../dist/index.js");
+const { swsInterface } = require("../../dist/index.js");
 // require('swagger-stats');
 
 // Mockup API implementation
@@ -47,41 +47,47 @@ const swaggerSpec = require("./petstore.json");
 const parser = new SwaggerParser();
 
 parser.validate(swaggerSpec, async (err) => {
-  if (!err) {
-    debug("Success validating swagger file!");
-    // swaggerSpec = api;
+  try {
+    if (!err) {
+      debug("Success validating swagger file!");
+      // swaggerSpec = api;
 
-    // Enable swagger-stats middleware
-    app.use(
-      await swStats.getMiddleware({
-        name: "swagger-stats-testapp",
-        version: "0.99.2",
-        timelineBucketDuration: tlBucket,
-        uriPath: "/swagger-stats",
-        swaggerSpec,
-        elasticsearch: "http://swagger-stats-elasticsearch:9200",
-        MONGO_URL: "127.0.0.1:27027",
-        SWAGGER_STATS_MONGO_DB: "swagger-stats",
-      }),
-    );
+      // Enable swagger-stats middleware
+      app.use(
+        await swsInterface.getMiddleware({
+          name: "swagger-stats-testapp",
+          version: "0.99.2",
+          timelineBucketDuration: tlBucket,
+          uriPath: "/swagger-stats",
+          swaggerSpec,
+          elasticsearch: "http://swagger-stats-elasticsearch:9200",
+          mongoUrl: "127.0.0.1:27027",
+          swaggerStatsMongoDb: "swagger-stats",
+          redisHost: "swagger-stats-redis",
+          redisPort: 6379,
+        }),
+      );
 
-    // Implement custom API in application to return collected statistics
-    app.get("/stats", (req, res) => {
-      res.setHeader("Content-Type", "application/json");
-      res.send(swStats.getCoreStats());
-    });
+      // Implement custom API in application to return collected statistics
+      app.get("/stats", (req, res) => {
+        res.setHeader("Content-Type", "application/json");
+        res.send(swsInterface.getCoreStats());
+      });
 
-    // Connect API Router - it should be the end of the chain
-    app.use("/v2", API);
+      // Connect API Router - it should be the end of the chain
+      app.use("/v2", API);
 
-    // Setup server
-    server = http.createServer(app);
-    server.listen(app.get("port"));
-    debug(
-      `Server started on port ${app.get("port")} http://localhost:${app.get(
-        "port",
-      )}`,
-    );
+      // Setup server
+      server = http.createServer(app);
+      server.listen(app.get("port"));
+      debug(
+        `Server started on port ${app.get("port")} http://localhost:${app.get(
+          "port",
+        )}`,
+      );
+    }
+  } catch (error) {
+    console.log("error :>> ", error);
   }
 });
 

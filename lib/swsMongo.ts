@@ -20,8 +20,6 @@ export class SwsMongo {
 
   private sessionsDb: ICollection<Session>;
 
-  private swaggerStatsDb: ICollection<any>;
-
   constructor(options: SwsOptions) {
     const { mongoUrl, mongoUsername, mongoPassword, swaggerStatsMongoDb } =
       options;
@@ -31,17 +29,15 @@ export class SwsMongo {
     this.mongoUrl = mongoUrl;
     this.mongoUsername = mongoUsername;
     this.mongoPasswords = mongoPassword;
-    this.swaggerStatsMongoDb = swaggerStatsMongoDb;
   }
 
-  public async init(): Promise<void> {
+  public init(): void {
     const uri = this.mongoUsername
       ? `mongodb://${this.mongoUsername}:${this.mongoPasswords}@${this.mongoUrl}/${this.swaggerStatsMongoDb}`
       : `mongodb://${this.mongoUrl}/${this.swaggerStatsMongoDb}`;
 
-    const db = monk(uri);
+    const db = monk(uri, { authSource: "admin" });
     this.sessionsDb = db.get<Session>("sessions");
-    this.swaggerStatsDb = db.get<any>("swagger-stats");
   }
 
   public async insertSession(session: Session): Promise<InsertResult<Session>> {
@@ -58,10 +54,11 @@ export class SwsMongo {
     ms: number,
   ): Promise<FindOneResult<Session>> {
     try {
-      const data = await this.sessionsDb.findOneAndUpdate(
+      await this.sessionsDb.update(
         { sid: sessionSid },
         { $set: { tsSec: ms } },
       );
+      const data = await this.sessionsDb.findOne({ sid: sessionSid });
       return data;
     } catch (err) {
       throw new Error(err);
@@ -83,10 +80,11 @@ export class SwsMongo {
     sessionId: string,
   ): Promise<FindOneResult<Session>> {
     try {
-      const data = await this.sessionsDb.findOneAndUpdate(
+      await this.sessionsDb.update(
         { sid: sessionId },
         { $set: { archived: true } },
       );
+      const data = await this.sessionsDb.findOne({ sid: sessionId });
       return data;
     } catch (err) {
       throw new Error(err);

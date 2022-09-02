@@ -50,7 +50,7 @@ export class SwsAuth {
     const sessions = await this.swsMongo.getAllSessions();
     // eslint-disable-next-line no-restricted-syntax
     for (const session of sessions) {
-      const isExpired = session.tsSec < tsSec + 500;
+      const isExpired = session.tsSec < tsSec + 5000;
       if (isExpired) {
         archiveByIdSessionPromises.push(
           this.swsMongo.archiveByIdSessions(session.sid),

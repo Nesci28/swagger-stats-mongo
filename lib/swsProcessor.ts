@@ -4,6 +4,7 @@
  * Created by sv2 on 2/18/17.
  * swagger-stats Processor. Processes requests / responses and maintains metrics
  */
+import Redis from "ioredis";
 import moment from "moment";
 
 import { SwsRequest } from "./interfaces/request.interface";
@@ -21,7 +22,7 @@ import { SwsTimeline } from "./swsTimeline";
 import { SwsUtil } from "./swsUtil";
 
 // swagger-stats Processor. Processes requests / responses and maintains metrics
-class SwsProcessor {
+export class SwsProcessor {
   // Timestamp when collecting statistics started
   private startts = Date.now();
 
@@ -57,16 +58,16 @@ class SwsProcessor {
   private sysStats = new SwsSysStats();
 
   // Core statistics
-  private coreStats = new SwsCoreStats();
+  private coreStats: SwsCoreStats;
 
   // Core Egress statistics
-  private coreEgressStats = new SwsCoreStats();
+  private coreEgressStats: SwsCoreStats;
 
   // Timeline
-  private timeline = new SwsTimeline();
+  private timeline: SwsTimeline;
 
   // API Stats
-  private apiStats = new SwsAPIStats();
+  private apiStats: SwsAPIStats;
 
   // Errors
   private errorsStats = new SwsErrors();
@@ -81,6 +82,13 @@ class SwsProcessor {
   private elasticsearchEmitter = new SwsElasticEmitter();
 
   private timer: any;
+
+  constructor(private readonly redis: Redis) {
+    this.apiStats = new SwsAPIStats(this.redis);
+    this.coreStats = new SwsCoreStats(this.redis);
+    this.coreEgressStats = new SwsCoreStats(this.redis);
+    this.timeline = new SwsTimeline(this.redis);
+  }
 
   public init(): void {
     this.processOptions();
@@ -291,7 +299,7 @@ class SwsProcessor {
     return written;
   }
 
-  public processRequest(req: SwsRequest): void {
+  public async processRequest(req: SwsRequest): Promise<void> {
     // Placeholder for sws-specific attributes
     req.sws = req.sws || {};
 
@@ -328,13 +336,13 @@ class SwsProcessor {
     this.coreStats.countRequest(req);
 
     // Timeline
-    this.timeline.countRequest(req);
+    await this.timeline.countRequest(req);
 
     // TODO Check if needed
     this.apiStats.countRequest(req);
   }
 
-  public processResponse(res: SwsResponse): void {
+  public async processResponse(res: SwsResponse): Promise<void> {
     try {
       const req = res._swsReq;
 
@@ -371,13 +379,13 @@ class SwsProcessor {
       }
 
       // Pass through Core Statistics
-      this.coreStats.countResponse(res);
+      await this.coreStats.countResponse(res);
 
       // Pass through Timeline
-      this.timeline.countResponse(res);
+      await this.timeline.countResponse(res);
 
       // Pass through API Statistics
-      this.apiStats.countResponse(res);
+      await this.apiStats.countResponse(res);
 
       // Pass through Errors
       this.errorsStats.countResponse(res);
@@ -477,6 +485,3 @@ class SwsProcessor {
     return result;
   }
 }
-
-const swsProcessor = new SwsProcessor();
-export = swsProcessor;

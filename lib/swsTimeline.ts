@@ -4,7 +4,9 @@
  * Timeline Statistics
  */
 import { Request, Response } from "express";
+import Redis from "ioredis";
 
+import { SwsOptions } from "./interfaces/options.interface";
 import { SwsReqResStats } from "./swsReqResStats";
 import { SwsUtil } from "./swsUtil";
 
@@ -35,7 +37,7 @@ interface Data {
 
 export class SwsTimeline {
   // Options
-  private options: { apdexThreshold?: number } = {};
+  private options: SwsOptions;
 
   // Timeline Settings
   public settings = {
@@ -59,6 +61,8 @@ export class SwsTimeline {
 
   // current max event loop lag
   private lag = 0;
+
+  constructor(private readonly redis: Redis) {}
 
   public getStats(): GetStats {
     const res = { settings: this.settings, data: this.data };
@@ -130,7 +134,11 @@ export class SwsTimeline {
   private openTimelineBucket(timelineid: number): void {
     // Open new bucket
     this.data[timelineid] = {
-      stats: new SwsReqResStats(this.options?.apdexThreshold),
+      stats: new SwsReqResStats(
+        this.options?.apdexThreshold,
+        this.redis,
+        timelineid.toString(),
+      ),
       sys: { rss: 0, heapTotal: 0, heapUsed: 0, external: 0, cpu: 0 },
     };
   }
@@ -206,18 +214,18 @@ export class SwsTimeline {
     );
   }
 
-  public countRequest(req: Request & { sws: any }): void {
+  public async countRequest(req: Request & { sws: any }): Promise<void> {
     // Count in timeline
-    this.getTimelineBucket(req.sws.timelineid).stats.countRequest(
-      req.sws.req_clength,
-    );
+    const timelineBucket = this.getTimelineBucket(req.sws.timelineid).stats;
+    await timelineBucket.countRequest(req.sws.req_clength);
   }
 
-  public countResponse(res: Response & { _swsReq: any }): void {
+  public async countResponse(res: Response & { _swsReq: any }): Promise<void> {
     const req = res._swsReq;
 
     // Update timeline stats
-    this.getTimelineBucket(req.sws.timelineid).stats.countResponse(
+    const timelineBucket = this.getTimelineBucket(req.sws.timelineid).stats;
+    await timelineBucket.countResponse(
       res.statusCode,
       SwsUtil.getStatusCodeClass(res.statusCode),
       req.sws.duration,
