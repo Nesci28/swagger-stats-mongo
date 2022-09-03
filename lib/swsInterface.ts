@@ -73,6 +73,8 @@ async function processGetStats(
   }
   res.setHeader("Content-Type", "application/json");
   const stats = await swsProcessor.getStats(req.sws.query);
+  console.log("stats :>> ", stats);
+  console.log("stats :>> ", JSON.stringify(stats));
   res.end(JSON.stringify(stats));
 }
 
@@ -157,10 +159,12 @@ async function expressMiddleware(
         return;
       }
       if (req.url.startsWith(swsSettings.pathStats)) {
-        return processGetStats(req, res);
+        await processGetStats(req, res);
+        return;
       }
       if (req.url.startsWith(swsSettings.pathMetrics)) {
-        return processGetMetrics(req, res);
+        await processGetMetrics(req, res);
+        return;
       }
       if (req.url.startsWith(swsSettings.pathLogout)) {
         await swsAuth.processLogout(req, res);
@@ -174,6 +178,7 @@ async function expressMiddleware(
 
       return next();
     } catch (err) {
+      console.log("i am here");
       console.log("err :>> ", err);
     }
   };

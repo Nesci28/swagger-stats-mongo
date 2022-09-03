@@ -362,13 +362,16 @@ export class SwsAPIStats {
   }
 
   // Update and stats per tick
-  public tick(totalElapsedSec: number): void {
+  public async tick(totalElapsedSec: number): Promise<void> {
     // Update Rates in apistats
     // eslint-disable-next-line no-restricted-syntax
     for (const path of Object.keys(this.apistats)) {
       // eslint-disable-next-line no-restricted-syntax
       for (const method of Object.keys(this.apistats[path])) {
-        this.apistats[path][method as HTTPMethod].updateRates(totalElapsedSec);
+        // eslint-disable-next-line no-await-in-loop
+        await this.apistats[path][method as HTTPMethod].updateRates(
+          totalElapsedSec,
+        );
       }
     }
   }

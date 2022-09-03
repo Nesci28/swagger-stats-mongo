@@ -124,14 +124,14 @@ export class SwsProcessor {
   }
 
   // Tick - called with specified interval to refresh timelines
-  public tick(that): void {
+  public async tick(that): Promise<void> {
     const ts = Date.now();
     const totalElapsedSec = (ts - that.startts) / 1000;
-    that.sysStats.tick(ts, totalElapsedSec);
-    that.coreStats.tick(ts, totalElapsedSec);
-    that.timeline.tick(ts, totalElapsedSec);
-    that.apiStats.tick(ts, totalElapsedSec);
-    that.elasticsearchEmitter.tick(ts, totalElapsedSec);
+    that.sysStats.tick();
+    await that.coreStats.tick(totalElapsedSec);
+    await that.timeline.tick(ts);
+    await that.apiStats.tick(totalElapsedSec);
+    that.elasticsearchEmitter.tick(ts);
   }
 
   // Collect all data for request/response pair
