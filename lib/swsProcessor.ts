@@ -106,7 +106,7 @@ export class SwsProcessor {
     this.elasticsearchEmitter.initialize(swsSettings);
 
     // Start tick
-    this.timer = setInterval(this.tick, 200, this);
+    this.timer = setInterval(await this.tick, 200, this);
   }
 
   // Stop
@@ -438,8 +438,8 @@ export class SwsProcessor {
     const result: { startts: number } & Record<string, unknown> = {
       startts: this.startts,
     };
-    result.all = this.coreStats.getStats();
-    result.egress = this.coreEgressStats.getStats();
+    result.all = await this.coreStats.getStats();
+    result.egress = await this.coreEgressStats.getStats();
     result.sys = this.sysStats.getStats();
 
     // add standard properties, returned always

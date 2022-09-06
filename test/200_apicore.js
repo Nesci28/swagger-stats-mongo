@@ -319,24 +319,8 @@ parser.validate(swaggerSpecUrl, (err, api) => {
           apiOpStatsUpdated.responses.should.be.equal(
             apiOpStatsInitial.responses + 4,
           );
-          console.log(
-            "apiOpStatsUpdated.errors :>> ",
-            apiOpStatsUpdated.errors,
-          );
-          console.log(
-            "apiOpStatsInitial.errors :>> ",
-            apiOpStatsInitial.errors,
-          );
           apiOpStatsUpdated.errors.should.be.equal(
             apiOpStatsInitial.errors + 2,
-          );
-          console.log(
-            "apiOpStatsUpdated.success :>> ",
-            apiOpStatsUpdated.success,
-          );
-          console.log(
-            "apiOpStatsInitial.success :>> ",
-            apiOpStatsInitial.success,
           );
           apiOpStatsUpdated.success.should.be.equal(
             apiOpStatsInitial.success + 1,

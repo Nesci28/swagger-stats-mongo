@@ -92,8 +92,8 @@ export class SwsCoreStats {
     );
   }
 
-  public getStats(): SwsReqResStats {
-    return this.all;
+  public async getStats(): Promise<SwsReqResStats> {
+    return this.all.getStats();
   }
 
   public getMethodStats(): CoreMethods {
@@ -106,7 +106,8 @@ export class SwsCoreStats {
     await this.all.updateRates(totalElapsedSec);
     // eslint-disable-next-line no-restricted-syntax
     for (const mname of Object.keys(this.method)) {
-      this.method[mname].updateRates(totalElapsedSec);
+      // eslint-disable-next-line no-await-in-loop
+      await this.method[mname].updateRates(totalElapsedSec);
     }
   }
 

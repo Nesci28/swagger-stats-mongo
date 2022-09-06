@@ -172,10 +172,7 @@ export class SwsReqResStats {
     }
 
     promises.push(
-      this.redis.incrby(
-        `${this.redisKey}-total_res_clength`,
-        +totalResClength + clength,
-      ),
+      this.redis.incrby(`${this.redisKey}-total_res_clength`, clength),
     );
 
     const isMaxResClengthSmaller = +maxResClength < clength;

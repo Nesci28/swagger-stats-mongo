@@ -608,9 +608,9 @@ export class SwsAPIStats {
     }
 
     apiOpDetails.code[res.statusCode].count += 1;
-    apiOpDetails.duration.countValue(req.sws.duration);
-    apiOpDetails.req_size.countValue(req.sws.req_clength);
-    apiOpDetails.res_size.countValue(req.sws.res_clength);
+    await apiOpDetails.duration.countValue(req.sws.duration);
+    await apiOpDetails.req_size.countValue(req.sws.req_clength);
+    await apiOpDetails.res_size.countValue(req.sws.res_clength);
 
     // update Prometheus metrics
     (this.promClientMetrics.api_request_total as promClient.Gauge<string>)

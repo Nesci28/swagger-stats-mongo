@@ -4,6 +4,7 @@
 
 import Debug from "debug";
 import { NextFunction } from "express";
+import safeStringify from "fast-safe-stringify";
 import path from "path";
 import promClient from "prom-client";
 import qs from "qs";
@@ -73,9 +74,7 @@ async function processGetStats(
   }
   res.setHeader("Content-Type", "application/json");
   const stats = await swsProcessor.getStats(req.sws.query);
-  console.log("stats :>> ", stats);
-  console.log("stats :>> ", JSON.stringify(stats));
-  res.end(JSON.stringify(stats));
+  res.end(safeStringify(stats));
 }
 
 // Process /swagger-stats/metrics request
@@ -178,7 +177,6 @@ async function expressMiddleware(
 
       return next();
     } catch (err) {
-      console.log("i am here");
       console.log("err :>> ", err);
     }
   };
