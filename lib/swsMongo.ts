@@ -29,6 +29,7 @@ export class SwsMongo {
     this.mongoUrl = mongoUrl;
     this.mongoUsername = mongoUsername;
     this.mongoPasswords = mongoPassword;
+    this.swaggerStatsMongoDb = swaggerStatsMongoDb;
   }
 
   public init(): void {
