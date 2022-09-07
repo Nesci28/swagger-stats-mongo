@@ -73,7 +73,7 @@ export class SwsProcessor {
   private errorsStats = new SwsErrors();
 
   // Last Errors
-  private lastErrors = new SwsLastErrors();
+  private lastErrors: SwsLastErrors;
 
   // Longest Requests
   private longestRequests = new SwsLongestRequests();
@@ -88,6 +88,7 @@ export class SwsProcessor {
     this.coreStats = new SwsCoreStats(this.redis);
     this.coreEgressStats = new SwsCoreStats(this.redis);
     this.timeline = new SwsTimeline(this.redis);
+    this.lastErrors = new SwsLastErrors(this.redis);
   }
 
   public async init(): Promise<void> {
@@ -104,6 +105,8 @@ export class SwsProcessor {
     await this.apiStats.initialize(swsSettings);
 
     this.elasticsearchEmitter.initialize(swsSettings);
+
+    await this.lastErrors.init();
 
     // Start tick
     this.timer = setInterval(await this.tick, 200, this);
@@ -394,7 +397,7 @@ export class SwsProcessor {
       const rrr = this.collectRequestResponseData(res);
 
       // Pass through last errors
-      this.lastErrors.processReqResData(rrr);
+      await this.lastErrors.processReqResData(rrr);
 
       // Pass through longest request
       this.longestRequests.processReqResData(rrr);
@@ -465,7 +468,7 @@ export class SwsProcessor {
     if (fieldMask & SwsUtil.swsStatFields.timeline)
       result.timeline = this.timeline.getStats();
     if (fieldMask & SwsUtil.swsStatFields.lasterrors)
-      result.lasterrors = this.lastErrors.getStats();
+      result.lasterrors = await this.lastErrors.getStats();
     if (fieldMask & SwsUtil.swsStatFields.longestreq)
       result.longestreq = this.longestRequests.getStats();
     if (fieldMask & SwsUtil.swsStatFields.apidefs)

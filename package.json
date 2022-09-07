@@ -1,8 +1,11 @@
 {
-    "name": "@nesci28/ts-swagger-stats-redis",
-    "version": "0.0.1-beta.13",
+    "name": "@okidoo/ts-swagger-stats-redis",
+    "version": "0.0.1",
     "description": "API Telemetry and APM. Trace API calls and Monitor API performance, health and usage statistics in Node.js Microservices, based on express routes and Swagger (Open API) specification",
     "main": "dist/index.js",
+    "publishConfig": {
+        "access": "public"
+    },
     "scripts": {
         "prepublishOnly": "npm run build",
         "build": "rm -rf ./dist && npm run copy:ux && tsc -p tsconfig.build.json",
@@ -87,9 +90,6 @@
         "LICENSE",
         "dist/*"
     ],
-    "publishConfig": {
-        "registry": "https://nexus.nos.sh/repository/npm/"
-    },
     "author": "https://github.com/sv2",
     "homepage": "http://swaggerstats.io",
     "bugs": {

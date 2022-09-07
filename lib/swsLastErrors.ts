@@ -4,29 +4,38 @@
  * Last Errors
  */
 
+import safeStringify from "fast-safe-stringify";
+import Redis from "ioredis";
+
 import { RequestResponseRecord } from "./interfaces/request-response-record.interface";
 import { SwsUtil } from "./swsUtil";
 
 export class SwsLastErrors {
   private last_errors: any[] = [];
 
-  public getStats(): any[] {
-    return this.last_errors;
+  constructor(private readonly redis: Redis) {}
+
+  public async getStats(): Promise<any[]> {
+    const result = await this.redis.get("last_errors");
+    const parsed = JSON.parse(result);
+    return parsed;
+  }
+
+  public async init(): Promise<void> {
+    await this.redis.set("last_errors", safeStringify([]));
   }
 
   // Add information about last error
-  public addError(rrr: RequestResponseRecord): void {
-    this.last_errors.push(rrr);
-    // Clean up if more than allowed
-    if (this.last_errors.length > 100) {
-      this.last_errors.shift();
-    }
+  public async addError(rrr: RequestResponseRecord): Promise<void> {
+    const errors = await this.getStats();
+    errors.push(rrr);
+    await this.redis.set("last_errors", safeStringify(errors));
   }
 
   // Check if this qualifies as longest request, and store is yes
-  public processReqResData(rrr: RequestResponseRecord): void {
+  public async processReqResData(rrr: RequestResponseRecord): Promise<void> {
     if (SwsUtil.isError(+rrr.http.response.code)) {
-      this.addError(rrr);
+      await this.addError(rrr);
     }
   }
 }
